@@ -47,11 +47,13 @@ def _get_reader():
         except ImportError as error:
             import sys
 
+            # Same reasoning as in speech.py: keep the original text, because a
+            # native library that fails to load looks exactly like a missing one.
             raise ScreenError(
-                "Komponen pembaca tulisan layar belum terpasang di Python yang "
-                "sedang dipakai.\n\n"
+                "Komponen pembaca tulisan layar tidak bisa dimuat.\n\n"
+                f"Keterangan asli dari Python:\n{type(error).__name__}: {error}\n\n"
                 f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
-                "Jalankan sekali perintah ini, lalu coba lagi:\n"
+                "Kalau keterangan di atas menyebut modul yang hilang, jalankan sekali:\n"
                 f'"{sys.executable}" -m pip install rapidocr-onnxruntime pillow'
             ) from error
         _reader = RapidOCR()

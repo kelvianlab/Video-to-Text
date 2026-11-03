@@ -49,10 +49,14 @@ def _import_whisper():
     except ImportError as error:
         import sys
 
+        # The original text is kept. An ImportError here is not always a missing
+        # package: a native library that fails to load reports itself the same
+        # way, and hiding that leaves nothing to act on.
         raise SpeechError(
-            "Komponen pembaca suara belum terpasang di Python yang sedang dipakai.\n\n"
+            "Komponen pembaca suara tidak bisa dimuat.\n\n"
+            f"Keterangan asli dari Python:\n{type(error).__name__}: {error}\n\n"
             f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
-            "Jalankan sekali perintah ini, lalu coba lagi:\n"
+            "Kalau keterangan di atas menyebut modul yang hilang, jalankan sekali:\n"
             f'"{sys.executable}" -m pip install faster-whisper'
         ) from error
 
