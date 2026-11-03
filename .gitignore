@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Hasil penyalinan video dan berkas uji
+*.txt
+*.srt
+!README*.txt
+uji/contoh/
+
+# Model yang diunduh otomatis, besarnya ratusan MB sampai GB
+model/
+*.onnx
+
+# Editor dan sistem operasi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
