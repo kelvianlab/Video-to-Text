@@ -45,9 +45,14 @@ def _get_reader():
         try:
             from rapidocr_onnxruntime import RapidOCR
         except ImportError as error:
+            import sys
+
             raise ScreenError(
-                "Pembaca tulisan layar belum terpasang. "
-                "Jalankan: pip install rapidocr-onnxruntime"
+                "Komponen pembaca tulisan layar belum terpasang di Python yang "
+                "sedang dipakai.\n\n"
+                f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
+                "Jalankan sekali perintah ini, lalu coba lagi:\n"
+                f'"{sys.executable}" -m pip install rapidocr-onnxruntime pillow'
             ) from error
         _reader = RapidOCR()
     return _reader

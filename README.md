@@ -26,9 +26,17 @@ This reads both, and lays them out in the order they happened:
 
 ## Using it
 
+Double-click **`Jalankan Video ke Teks.bat`**, or run:
+
 ```
 python -m video_to_text
 ```
+
+The launcher exists because this is easy to get wrong on a machine with more than
+one Python. Calling plain `python` picks whichever one is first on PATH, and an
+active conda environment puts itself there, so the app can open on a Python that
+has none of its components installed. The launcher looks for one that can actually
+import what it needs, and uses that.
 
 1. Pick one video, or a folder holding many.
 2. Pick **Cepat** (fast) or **Teliti** (thorough).

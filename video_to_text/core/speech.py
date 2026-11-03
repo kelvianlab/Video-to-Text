@@ -35,13 +35,35 @@ def gpu_usable() -> bool:
         return False
 
 
+def _import_whisper():
+    """Import faster-whisper, or explain in plain words how to install it.
+
+    A bare ModuleNotFoundError tells a non-technical user nothing, and it is the
+    most likely thing to go wrong: on a machine with several Pythons, the app can
+    start on one that has no components installed.
+    """
+    try:
+        from faster_whisper import WhisperModel
+
+        return WhisperModel
+    except ImportError as error:
+        import sys
+
+        raise SpeechError(
+            "Komponen pembaca suara belum terpasang di Python yang sedang dipakai.\n\n"
+            f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
+            "Jalankan sekali perintah ini, lalu coba lagi:\n"
+            f'"{sys.executable}" -m pip install faster-whisper'
+        ) from error
+
+
 def _load_model(name: str, use_gpu: bool):
     """Prepare a model and keep it, so the next video does not reload it."""
     device = "cuda" if use_gpu else "cpu"
     precision = "float16" if use_gpu else "int8"
     key = (name, device)
     if key not in _loaded_models:
-        from faster_whisper import WhisperModel
+        WhisperModel = _import_whisper()
 
         try:
             _loaded_models[key] = WhisperModel(name, device=device, compute_type=precision)
