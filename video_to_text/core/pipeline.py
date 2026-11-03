@@ -82,12 +82,22 @@ def process_video(
 
             say("Membaca suara menjadi teks...")
             result.used_gpu = use_gpu and speech.gpu_usable()
+
+            def gpu_gave_out(reason: str) -> None:
+                result.used_gpu = False
+                result.notes.append(
+                    "Kartu grafis berhenti di tengah jalan, pekerjaan dilanjutkan "
+                    f"dengan prosesor. Keterangan: {reason[:120]}"
+                )
+                say("Kartu grafis bermasalah, beralih ke prosesor...")
+
             speech_segments = speech.transcribe(
                 wav_file,
                 quality.speech_model,
                 use_gpu=result.used_gpu,
                 language=language,
                 report=lambda second: say(f"Membaca suara... detik ke-{int(second)}"),
+                on_gpu_failure=gpu_gave_out,
             )
         else:
             result.notes.append("Video ini tidak punya suara, jadi hanya layar yang dibaca.")

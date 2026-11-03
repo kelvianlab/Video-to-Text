@@ -25,11 +25,20 @@ class SpeechError(Exception):
 
 
 def gpu_usable() -> bool:
-    """Check that the graphics card really works, not merely that one exists."""
+    """Check that the graphics card really works, not merely that one exists.
+
+    This has to run an actual transcription, not just build the model. Building
+    one succeeds on a machine whose CUDA maths libraries are missing, because
+    cuBLAS is only loaded once there is something to compute; the failure then
+    lands in the middle of a real video instead of here.
+    """
     try:
+        import numpy as np
         from faster_whisper import WhisperModel
 
-        WhisperModel("tiny", device="cuda", compute_type="float16")
+        model = WhisperModel("tiny", device="cuda", compute_type="float16")
+        silence = np.zeros(16000, dtype=np.float32)  # one second
+        list(model.transcribe(silence, beam_size=1)[0])
         return True
     except Exception:
         return False
@@ -80,21 +89,71 @@ def _load_model(name: str, use_gpu: bool):
     return _loaded_models[key]
 
 
+def read_wav(wav_file: Path):
+    """Read a 16 kHz mono 16-bit WAV into the float array Whisper expects.
+
+    Doing this here rather than handing Whisper the file path keeps PyAV out of
+    the picture entirely. faster-whisper otherwise decodes the file itself by
+    calling av.open(..., metadata_errors=...), an argument PyAV 19 removed, so
+    the two break against each other even though their declared versions agree.
+    Since media.extract_audio already produced this exact WAV with ffmpeg, there
+    is nothing left for a second decoder to do.
+    """
+    import wave
+
+    import numpy as np
+
+    with wave.open(str(wav_file), "rb") as handle:
+        if handle.getsampwidth() != 2 or handle.getnchannels() != 1:
+            raise SpeechError(
+                "Berkas suara sementara tidak sesuai dugaan "
+                f"({handle.getnchannels()} kanal, {handle.getsampwidth() * 8} bit)."
+            )
+        frames = handle.readframes(handle.getnframes())
+
+    return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def transcribe(
     wav_file: Path,
     model_name: str,
     use_gpu: bool = True,
     language: str | None = None,
     report: Callable[[float], None] | None = None,
+    on_gpu_failure: Callable[[str], None] | None = None,
 ) -> list[SpeechSegment]:
     """Turn audio into timed segments of speech.
 
     *report* is called with the last second finished, so the window can show
-    progress while the work runs.
+    progress while the work runs. *on_gpu_failure* is called with the reason if
+    the graphics card gives out and the work moves to the processor.
     """
+    audio = read_wav(wav_file)
+    try:
+        return _run(audio, model_name, use_gpu, language, report)
+    except RuntimeError as error:
+        if not use_gpu:
+            raise SpeechError(
+                f"Pembacaan suara gagal.\n\nKeterangan asli:\n{error}"
+            ) from error
+        # The card passed its check but gave out part-way through. The work still
+        # has to finish, so it moves to the processor, and the caller is told so
+        # the report does not claim a card did work it did not do.
+        if on_gpu_failure:
+            on_gpu_failure(str(error))
+        return _run(audio, model_name, use_gpu=False, language=language, report=report)
+
+
+def _run(
+    audio,
+    model_name: str,
+    use_gpu: bool,
+    language: str | None,
+    report: Callable[[float], None] | None,
+) -> list[SpeechSegment]:
     model = _load_model(model_name, use_gpu)
     segments, _ = model.transcribe(
-        str(wav_file),
+        audio,
         language=language,
         vad_filter=True,
         beam_size=5,

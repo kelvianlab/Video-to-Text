@@ -123,7 +123,11 @@ def extract_frames(
     result = _run([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video),
-        "-vf", f"fps={rate},scale={width}:-2:flags=bicubic",
+        # format=yuvj420p is not decoration. Videos that carry a limited colour
+        # range, which most downloaded video does, make the JPEG encoder refuse
+        # outright: "Non full-range YUV is non-standard". Converting here means
+        # every video is handed over in the one form the encoder accepts.
+        "-vf", f"fps={rate},scale={width}:-2:flags=bicubic,format=yuvj420p",
         "-q:v", "3",
         str(target_folder / "frame_%06d.jpg"),
     ])
