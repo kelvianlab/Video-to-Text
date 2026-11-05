@@ -33,6 +33,7 @@ call :check "%USERPROFILE%\anaconda3\python.exe"
 if defined FOUND goto run
 if defined FIRST (
     set "FOUND=!FIRST!"
+    set "FOUNDPATH=!FIRSTPATH!"
     echo.
     echo Peringatan: tidak ada Python yang lolos pemeriksaan komponen.
     echo Aplikasi tetap dibuka supaya pesan galatnya bisa dibaca.
@@ -44,6 +45,12 @@ goto tanpa_python
 
 :run
 echo Memakai Python: %FOUND%
+REM Name the personal package folder outright instead of trusting Python to find
+REM it. Python's own site module discovers that folder by walking the Roaming
+REM profile, and that walk can come back empty while the folder is perfectly
+REM intact, which showed up here as faster-whisper vanishing on one run and
+REM being present on the next. Spelling the path out skips the walk.
+if defined FOUNDPATH set "PYTHONPATH=%FOUNDPATH%;%PYTHONPATH%"
 "%FOUND%" -m video_to_text
 if errorlevel 1 goto gagal
 endlocal
@@ -61,14 +68,34 @@ if errorlevel 1 (
     >> "%LOG%" echo    tidak bisa dijalankan
     exit /b 0
 )
-if not defined FIRST set "FIRST=%~1"
+REM Ask this Python where its personal package folder is, and put that folder on
+REM the search path by hand for the check below. Without this the check can fail
+REM on a Python that has everything installed.
+REM The answer is written to a file rather than captured from the screen. A
+REM for /f capture would have to carry the brackets of getusersitepackages()
+REM through the command parser, where brackets mean something else.
+set "USERSITE="
+set "SITEFILE=%TEMP%\video-to-text-usersite.txt"
+del "%SITEFILE%" >nul 2>&1
+"%~1" -c "import site,sys;open(sys.argv[1],'w').write(site.getusersitepackages())" "%SITEFILE%" >nul 2>&1
+if exist "%SITEFILE%" set /p USERSITE=<"%SITEFILE%"
+>> "%LOG%" echo    folder paket pribadi: !USERSITE!
+
+if not defined FIRST (
+    set "FIRST=%~1"
+    set "FIRSTPATH=!USERSITE!"
+)
+
+set "PYTHONPATH=!USERSITE!"
 "%~1" -c "import faster_whisper, rapidocr_onnxruntime, PIL, tkinter" >> "%LOG%" 2>&1
+set "PYTHONPATH="
 if errorlevel 1 (
     >> "%LOG%" echo    komponen belum lengkap di Python ini
     exit /b 0
 )
 >> "%LOG%" echo    semua komponen lengkap, dipakai
 set "FOUND=%~1"
+set "FOUNDPATH=!USERSITE!"
 exit /b 0
 
 :tanpa_python
