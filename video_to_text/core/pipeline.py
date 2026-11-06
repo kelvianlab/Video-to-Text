@@ -1,10 +1,10 @@
 """The main run: one video in, a .txt and a .srt out.
 
 The order is:
-    extract audio -> read speech -> take screen frames -> read screens
+    load audio -> read speech -> take screen frames -> read screens
     -> merge by time -> save
 
-Working files go in the system's temporary folder and are deleted afterwards.
+Screen frames go in the system's temporary folder and are deleted afterwards.
 The source video is never opened for writing.
 """
 
@@ -32,6 +32,8 @@ class VideoResult:
     frames_checked: int = 0
     frames_read: int = 0
     used_gpu: bool = False
+    language: str = ""
+    language_was_detected: bool = False
     had_audio: bool = True
     error: str | None = None
     notes: list[str] = field(default_factory=list)
@@ -43,9 +45,11 @@ def _summary(quality: Quality, result: VideoResult) -> str:
         speech_part = "Video tanpa suara, jadi hanya tulisan layar yang dibaca."
     else:
         device = "kartu grafis NVIDIA" if result.used_gpu else "prosesor (CPU)"
+        name = speech.LANGUAGE_NAMES.get(result.language, result.language)
+        how = "dipilih otomatis" if result.language_was_detected else "dipilih pengguna"
         speech_part = (
-            f"Suara dibaca model {quality.speech_model} dengan {device}: "
-            f"{result.speech_count} potongan."
+            f"Suara berbahasa {name} ({how}), dibaca model {quality.speech_model} "
+            f"dengan {device}: {result.speech_count} potongan."
         )
     return (
         f"Mutu: {quality.label}. {speech_part} "
@@ -75,30 +79,30 @@ def process_video(
         speech_segments: list = []
         if details.has_audio:
             say("Mengambil suara dari video...")
-            wav_file = media.extract_audio(video, workspace / "audio.wav")
+            audio = media.load_audio(video)
             if stop_now():
                 result.error = "Dihentikan oleh pengguna."
                 return result
 
             say("Membaca suara menjadi teks...")
-            result.used_gpu = use_gpu and speech.gpu_usable()
-
-            def gpu_gave_out(reason: str) -> None:
-                result.used_gpu = False
-                result.notes.append(
-                    "Kartu grafis berhenti di tengah jalan, pekerjaan dilanjutkan "
-                    f"dengan prosesor. Keterangan: {reason[:120]}"
-                )
-                say("Kartu grafis bermasalah, beralih ke prosesor...")
-
-            speech_segments = speech.transcribe(
-                wav_file,
+            speech_result = speech.transcribe(
+                audio,
                 quality.speech_model,
-                use_gpu=result.used_gpu,
+                use_gpu=use_gpu,
                 language=language,
+                beam_size=quality.beam_size,
                 report=lambda second: say(f"Membaca suara... detik ke-{int(second)}"),
-                on_gpu_failure=gpu_gave_out,
             )
+            speech_segments = speech_result.segments
+            result.used_gpu = speech_result.used_gpu
+            result.language = speech_result.language
+            result.language_was_detected = speech_result.language_was_detected
+            if speech_result.gpu_note:
+                result.notes.append(
+                    "Kartu grafis NVIDIA ada tetapi belum bisa dipakai, jadi suara dibaca "
+                    "dengan prosesor. Hasilnya sama, hanya lebih lambat. "
+                    f"Keterangan teknis: {speech_result.gpu_note[:120]}"
+                )
         else:
             result.notes.append("Video ini tidak punya suara, jadi hanya layar yang dibaca.")
 

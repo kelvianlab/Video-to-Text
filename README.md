@@ -2,125 +2,144 @@
 
 **Turn a video into text: both the words that are spoken and the words shown on screen.**
 
-Runs on your own machine. Your video is never uploaded and never modified.
+Runs on your own computer. Your video is never uploaded and never modified.
+It works on any video file you have, whether or not it ever had subtitles.
 
-The app's own window is in Indonesian, because it was built for Indonesian users.
+The app's window is in Indonesian, because it was built for Indonesian users.
 
 ---
 
-## Why this exists
+## Download and use
 
-Screen recordings carry a lot that is never said out loud: the command typed into
-a terminal, an error message, a number ticking upward, a subtitle burned into the
-picture. An ordinary transcriber only listens to the audio, so all of that is lost.
+> **Bahasa Indonesia:** unduh `Video-ke-Teks-…-Windows.zip` dari halaman
+> [Releases](../../releases/latest), klik kanan lalu **Extract All**, buka folder
+> `Video ke Teks`, lalu klik dua kali **`Video ke Teks.exe`**. Tidak perlu memasang
+> Python, ffmpeg, atau apa pun. Tidak perlu internet.
 
-This reads both, and lays them out in the order they happened:
+1. Download **`Video-ke-Teks-<version>-Windows.zip`** from the
+   [Releases](../../releases/latest) page. It is about 600 MB, because everything the
+   app needs is inside it.
+2. Right-click the zip and choose **Extract All**. Keep the extracted folder together;
+   the `.exe` needs the `_internal` folder next to it.
+3. Open the folder and double-click **`Video ke Teks.exe`**.
+
+Nothing to install, nothing else to download, no internet needed. Python, the video
+decoder, and both reading models all travel inside the folder.
+
+The first time, Windows may say **"Windows protected your PC"**. That is because the
+app is not code-signed, not because anything is wrong with it. Click **More info**,
+then **Run anyway**. Windows asks only once.
+
+### In the window
+
+1. **Pick a video**, or a folder of videos (they are done one by one).
+2. **Pick Cepat or Teliti** (fast or thorough, see below).
+3. **Pick the spoken language**, or leave it on automatic.
+4. Press **Mulai**.
+
+The results land next to the video: a `.txt` to read, and a `.srt` that any video
+player can load as subtitles. A file that is already there is **never overwritten**;
+if the name is taken the result gets a number, for example `video (2).txt`.
+
+## What the result looks like
 
 ```
-[00:00:12] [SUARA] jadi sekarang kita jalankan perintahnya
-[00:00:14] [LAYAR] PS C:\> python -m video_to_text --run "D:\Video"
-[00:00:21] [LAYAR] Discovered 8.046 items (5,23GB)
+[00:00:00] [SUARA] Gila kamu Mas, kamu yang gila!
+[00:00:05] [LAYAR] Ultra
+                    Claude Code included
+                    No 5-hour limit
+[00:00:10] [SUARA] Itu adalah contoh drama, teman-teman.
+[00:00:21] [LAYAR] CHATGPT
+                    CLAUDE
+[00:00:23] [LAYAR] GEMINI
+                    DEEPSEEK
 ```
 
-`SUARA` means heard, `LAYAR` means shown on screen.
+`SUARA` is what was heard, `LAYAR` is what was shown. Each screen entry holds only the
+lines that were new at that moment, so a title that stays on screen for the whole video
+is written once, not once a second.
 
-## Using it
+## Languages
 
-Double-click **`Jalankan Video ke Teks.bat`**, or run:
+The app is built for **English and Indonesian**. Each is written in the language it
+was spoken in; nothing is translated.
+
+On automatic, the app chooses between those two only. That matters more than it
+sounds: left to itself, the speech model often hears Indonesian as Malay, the two
+share most of their words, and a whole Indonesian video can come back spelled as
+Malay. Choosing between English and Indonesian alone, with Malay counted as
+Indonesian, removes that mistake. Other languages are not supported.
+
+## Cepat or Teliti
+
+Both use the same speech model. Teliti searches harder for the right wording and
+looks at the screen twice as often.
+
+| | Cepat (fast) | Teliti (thorough) |
+|---|---|---|
+| Speech | narrow search | wide search, better with names and rare words |
+| Screen picture taken every | 2 seconds | 1 second |
+| 39 s English video, screen changing constantly | about 50 s | about 70 s |
+| 2 min Indonesian video | about 85 s | about 140 s |
+
+Timings are from a laptop working on its processor alone. A video whose screen
+mostly holds still is quicker, because an unchanged screen is skipped without being
+read.
+
+**An NVIDIA graphics card** can speed up the speech side, but only on a computer
+that already has NVIDIA's CUDA 12 libraries installed; they are far too large to
+ship inside the app. Without them the app simply uses the processor, and the
+result is the same.
+
+## How accurate is it
+
+The result is a machine's best guess, not a guaranteed transcript.
+
+**Speech.** On a 2-minute Indonesian video full of slang and English tech terms, the
+sentences came through whole and readable. What goes wrong is names and brand words:
+`Claude` heard as `cloud`, `DeepSeek` as `deepsik`. Read the result before quoting it.
+
+**On-screen text.** English keeps its spaces (`SHORT FOR REVERSE`, `On the rise`).
+What goes wrong: `I` and `l` get swapped (`Can Al find`), text cut off at the edge of
+the frame is read in part, and very small, blurred, or briefly shown text can be
+missed.
+
+## Running from source
+
+Only needed to work on the app itself. Python 3.14:
 
 ```
+pip install -r requirements-build.txt
+python packaging/fetch_models.py small
+python -m pytest -q
 python -m video_to_text
 ```
 
-The launcher exists because this is easy to get wrong on a machine with more than
-one Python. Calling plain `python` picks whichever one is first on PATH, and an
-active conda environment puts itself there, so the app can open on a Python that
-has none of its components installed. The launcher looks for one that can actually
-import what it needs, and uses that.
+`fetch_models.py` puts the models in `model/` (about 475 MB, once). It is the only
+step anywhere that touches the internet; the app never does.
 
-1. Pick one video, or a folder holding many.
-2. Pick **Cepat** (fast) or **Teliti** (thorough).
-3. Press **Mulai** (start).
-
-The results land next to the video: a `.txt` to read, and a `.srt` that a video
-player can load as subtitles.
-
-A file that is already there is **never overwritten**. If the name is taken, the
-result gets a number, for example `video (2).txt`.
-
-### Headless, from a terminal
+Headless, from a terminal:
 
 ```
-python -m video_to_text --run "D:\Video" --quality thorough
+python -m video_to_text --run "D:\Video" --quality thorough --language id
 ```
 
 Exit codes: `0` all done, `1` some failed, `2` the request could not be carried out.
 
-## Fast or Thorough
-
-| | Fast (Cepat) | Thorough (Teliti) |
-|---|---|---|
-| Speech model | `small`, 484 MB download | `medium`, 1.5 GB download |
-| Screen frame taken every | 2 seconds | 1 second |
-| Speed | roughly 3 to 4 times quicker | slower |
-
-A model is downloaded once. After that the tool runs with no internet at all.
-The download size is always stated before anything is fetched.
-
-## What it needs
-
-| Needs | Note |
-|---|---|
-| Python 3.10 or newer | |
-| ffmpeg | must be callable from the terminal |
-| `faster-whisper` | reads the speech; does not need PyTorch |
-| `rapidocr-onnxruntime` | reads the on-screen text |
-| An NVIDIA card | optional, but makes the speech side far quicker |
+### Building the download
 
 ```
-pip install faster-whisper rapidocr-onnxruntime pillow
+packaging\build.bat
 ```
 
-## How accurate is it
+This installs the exact library versions in `requirements.txt`, fetches the models,
+runs the tests, builds the app folder with PyInstaller, gathers every bundled
+component's licence into it, and zips it. The result is
+`dist\Video-ke-Teks-<version>-Windows.zip`.
 
-The result is a machine's best guess, not a guaranteed transcript. These numbers
-come from real recordings, so you know what to expect.
-
-**On-screen text.** On a screenshot of an Indonesian-language app, all 11 lines
-were read correctly, at confidence 0.74 to 0.94. A long sentence such as
-*"Aman: folder sumber hanya dibaca, tidak ada yang diubah atau dihapus di sana"*
-came through whole and correct.
-
-**What it gets wrong.** Letters that resemble digits get swapped, `l` read as `1`.
-Text cut off at the edge of the screen is read in part. Spaces between English
-words sometimes vanish, giving `batman thedark knight`. Text that is very small,
-blurred, or on screen only briefly can be missed completely.
-
-**Speed.** A 40-second recording whose screen changed constantly took 39 seconds
-on Fast without a graphics card. A video whose screen mostly holds still is far
-quicker, because unchanged screens are skipped without being read.
-
-## Not writing the same screen twice
-
-There are two filters, and which one does what matters.
-
-**The frame filter** compares a screen with the one before it. If nothing changed,
-the frame is skipped without being read at all. This exists purely to save time.
-
-The screen is split into tiles and the **most-changed** tile is taken, rather than
-the average across the whole screen. That is necessary because the changes worth
-catching often occupy a small patch. Measured on a real recording, a counter going
-from `1.912 items` to `8.046 items` reads as **0.0001** when averaged over the whole
-screen, but **0.003 to 0.014** when measured by tile.
-
-**The text filter** compares what was read against the previous reading. This is
-what decides whether a screen is recorded. Two screens count as the same only when
-every number matches exactly **and** the rest of the text is near enough identical.
-
-The rule about numbers is deliberate: on a progress dialog or a terminal, the number
-is the part that changes and the part worth keeping. The cost is that a `l` misread
-as `1` produces one duplicate line. That trade was taken knowingly: a spare line
-costs less than a changed number vanishing without trace.
+The app is one folder rather than one `.exe` on purpose. A single `.exe` this size
+unpacks several hundred MB to the temp folder on every launch, which takes tens of
+seconds and is scanned by antivirus each time. The folder starts straight away.
 
 ## Layout
 
@@ -129,43 +148,35 @@ video_to_text/
   __main__.py        entry point, with or without the window
   window.py          the window; every string the user sees lives here
   core/
-    settings.py      the numbers that separate Fast from Thorough
-    media.py         ffmpeg: video details, audio, screen frames
-    speech.py        Whisper
-    screen.py        OCR and the two repetition filters
+    settings.py      the numbers that separate Cepat from Teliti
+    media.py         reading the video: details, sound, screen pictures (PyAV)
+    speech.py        Whisper, the bundled model, choosing the language
+    screen.py        OCR, and the filters that stop repeats
     timeline.py      merging heard and shown by time
     output.py        writing .txt and .srt without overwriting
     pipeline.py      one video from start to saved files
-tests/
-  test_core.py       the parts that decide what ends up in the result
-```
-
-`core` needs no window, so it can be tested and driven from a terminal.
-`timeline`, `output`, and the filters in `screen` need no model at all, which is
-why the whole test suite finishes in well under a second.
-
-## Running the tests
-
-```
-pip install pytest
-python -m pytest tests -q
+packaging/           build recipe, model fetcher, licence collector, zipper
+tests/               runs the real video reader and the real window
 ```
 
 ## Deliberate limits
 
 - The source video is only ever read, never written to or deleted.
-- Nothing from the video is sent anywhere. The only time an internet connection
-  is needed is the first download of a model.
+- Nothing from the video is sent anywhere. The app works with no internet at all.
 - A result file that already exists is never overwritten.
-- No part of the video or its text is stored anywhere except the result files.
 
 ## License
 
-[MIT](LICENSE)
+The app's own code: [MIT](LICENSE).
 
-This tool calls on other people's work, each under its own licence:
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (MIT),
-[RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache 2.0), and
-[ffmpeg](https://ffmpeg.org/) (LGPL or GPL, depending on the build installed).
-The Whisper models come from OpenAI under the MIT licence. All three are called as
-separate tools; none of their code is copied into this one.
+The download also carries other people's work, each under its own licence, all
+listed in `THIRD-PARTY-NOTICES.txt` inside the app folder with their licence texts
+in `_internal/licenses/`. The main ones:
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) and
+[CTranslate2](https://github.com/OpenNMT/CTranslate2) (MIT),
+the Whisper model (MIT),
+[RapidOCR](https://github.com/RapidAI/RapidOCR) and the PaddleOCR models (Apache 2.0),
+[PyAV](https://github.com/PyAV-Org/PyAV) (BSD) with FFmpeg inside it (LGPL 3).
+PyAV's FFmpeg is linked against the x264 and x265 encoders (GPL 2); this app only
+reads video and never uses them, but their files are present, so the notices say
+where their source can be had.

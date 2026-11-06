@@ -9,6 +9,16 @@ keep the work from taking longer than it needs to:
    cheaper than running OCR on one.
 2. After a frame is read, its text is compared with the previous text. If they
    say the same thing, nothing new is recorded.
+
+And when a screen is recorded, only the lines that were not already on the
+previous screen are written. A title that stays put for a whole video is
+written once, not once per second.
+
+Text is read with PaddleOCR's Latin model rather than RapidOCR's default
+Chinese one. On real frames the default ran English words together
+("THERE'SAGITHUBPROJECT", "Ontherise"); the Latin model keeps the spaces, reads
+Indonesian just as well, and was slightly faster. The app is built for English
+and Indonesian, so losing Chinese characters costs nothing.
 """
 
 from __future__ import annotations
@@ -39,24 +49,35 @@ class ScreenError(Exception):
     """The screen-text reader could not be used."""
 
 
+LATIN_MODEL = "en_PP-OCRv3_rec_infer.onnx"
+
+
+def latin_model_path() -> Path:
+    from .speech import model_folder
+
+    return model_folder() / "ocr" / LATIN_MODEL
+
+
 def _get_reader():
     global _reader
     if _reader is None:
         try:
             from rapidocr_onnxruntime import RapidOCR
         except ImportError as error:
-            import sys
-
-            # Same reasoning as in speech.py: keep the original text, because a
-            # native library that fails to load looks exactly like a missing one.
+            # Keep the original text: a native library that fails to load looks
+            # exactly like a missing one, and hiding it leaves nothing to act on.
             raise ScreenError(
                 "Komponen pembaca tulisan layar tidak bisa dimuat.\n\n"
-                f"Keterangan asli dari Python:\n{type(error).__name__}: {error}\n\n"
-                f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
-                "Kalau keterangan di atas menyebut modul yang hilang, jalankan sekali:\n"
-                f'"{sys.executable}" -m pip install rapidocr-onnxruntime pillow'
+                f"Keterangan asli:\n{type(error).__name__}: {error}\n\n"
+                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
             ) from error
-        _reader = RapidOCR()
+        latin = latin_model_path()
+        if not latin.is_file():
+            raise ScreenError(
+                f"Model pembaca tulisan tidak ada di dalam aplikasi.\nDicari di: {latin}\n\n"
+                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
+            )
+        _reader = RapidOCR(rec_model_path=str(latin))
     return _reader
 
 
@@ -139,6 +160,38 @@ def same_screen(first: str, second: str, threshold: float = 0.985) -> bool:
     return difflib.SequenceMatcher(None, left, right).ratio() >= threshold
 
 
+def _squeezed(line: str) -> str:
+    """A line with spacing and case removed, so OCR wobble does not count."""
+    return "".join(line.split()).lower()
+
+
+def _already_shown(line: str, earlier: list[str], threshold: float = 0.85) -> bool:
+    """Whether *line* is a re-reading of one of the *earlier* lines.
+
+    Numbers must match exactly, for the same reason as in same_screen: a
+    counter that changed is news even when the words around it are not.
+    """
+    import difflib
+
+    squeezed = _squeezed(line)
+    numbers = numbers_in(line)
+    for other in earlier:
+        if numbers_in(other) != numbers:
+            continue
+        if squeezed == _squeezed(other):
+            return True
+        if difflib.SequenceMatcher(None, squeezed, _squeezed(other)).ratio() >= threshold:
+            return True
+    return False
+
+
+def new_lines(text: str, previous_text: str) -> str:
+    """The lines of *text* that were not already on the previous screen."""
+    earlier = previous_text.splitlines()
+    fresh = [line for line in text.splitlines() if not _already_shown(line, earlier)]
+    return "\n".join(fresh)
+
+
 def read_screens(
     timed_frames: list[tuple[float, Path]],
     min_frame_change: float,
@@ -153,7 +206,8 @@ def read_screens(
     reader = _get_reader()
     found: list[ScreenSegment] = []
     previous_fingerprint: list[int] | None = None
-    previous_text = ""
+    previous_text = ""   # everything the last recorded screen said
+    pending = ""         # the part of it that was new, waiting to be written
     appeared_at = 0.0
     total = len(timed_frames)
     read_count = 0
@@ -180,12 +234,17 @@ def read_screens(
         if previous_text and same_screen(previous_text, text):
             continue  # same words, only shifted slightly or misread
 
-        if previous_text:
-            found.append(ScreenSegment(appeared_at, seconds, previous_text))
+        fresh = new_lines(text, previous_text) if previous_text else text
         previous_text = text
+        if not fresh:
+            continue  # only something disappeared; nothing new to write down
+
+        if pending:
+            found.append(ScreenSegment(appeared_at, seconds, pending))
+        pending = fresh
         appeared_at = seconds
 
-    if previous_text:
+    if pending:
         ended_at = timed_frames[-1][0] + interval_seconds if timed_frames else appeared_at
-        found.append(ScreenSegment(appeared_at, ended_at, previous_text))
+        found.append(ScreenSegment(appeared_at, ended_at, pending))
     return found

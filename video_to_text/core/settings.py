@@ -21,9 +21,14 @@ class Quality:
 
     # Speech side
     speech_model: str
-    """Whisper model name. Bigger is more accurate but slower."""
-    download_size: str
-    """Model download size, shown to the user before anything is downloaded."""
+    """Whisper model name. It must be one the app ships with."""
+    beam_size: int
+    """How many candidate wordings Whisper weighs at each step.
+
+    Measured on two minutes of Indonesian speech with the small model on CPU:
+    1 took 39 s, 5 took 69 s, and both read the words correctly. The wider
+    search mostly helps with names and rare words.
+    """
 
     # Screen side
     frame_interval_seconds: float
@@ -49,12 +54,11 @@ FAST = Quality(
     code="fast",
     label="Cepat",
     explanation=(
-        "Kira-kira 3 sampai 4 kali lebih cepat. Cocok untuk melihat isi video "
-        "secara garis besar. Kata yang jarang dipakai dan tulisan kecil di layar "
-        "lebih sering salah."
+        "Hampir dua kali lebih cepat. Cocok untuk melihat isi video secara garis "
+        "besar. Nama dan istilah yang jarang dipakai lebih sering salah dengar."
     ),
     speech_model="small",
-    download_size="484 MB",
+    beam_size=1,
     frame_interval_seconds=2.0,
     min_frame_change=0.0030,
     min_confidence=0.60,
@@ -68,8 +72,8 @@ THOROUGH = Quality(
         "melewatkan tulisan di layar. Pakai ini kalau hasilnya mau dijadikan "
         "catatan atau naskah."
     ),
-    speech_model="medium",
-    download_size="1,5 GB",
+    speech_model="small",
+    beam_size=5,
     frame_interval_seconds=1.0,
     min_frame_change=0.0015,
     min_confidence=0.50,

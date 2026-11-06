@@ -1,0 +1,10 @@
+# Exact versions the packaged app was built and tested with.
+# Users do not need any of this: they download the finished app.
+faster-whisper==1.2.1
+ctranslate2==4.8.4
+av==19.0.2
+rapidocr-onnxruntime==1.2.3
+onnxruntime==1.31.1
+pillow==11.3.0
+numpy==2.5.2
+huggingface_hub==2.3.0

@@ -33,7 +33,7 @@ def _headless(argv: list[str]) -> int:
     from .core.settings import find_quality
 
     if not argv:
-        print('Usage: python -m video_to_text --run PATH [--quality fast|thorough]')
+        print("Usage: python -m video_to_text --run PATH [--quality fast|thorough] [--language id|en]")
         return 2
 
     location = Path(argv[0])
@@ -45,14 +45,18 @@ def _headless(argv: list[str]) -> int:
             return 2
         quality_code = argv[position + 1]
 
+    language = None
+    if "--language" in argv:
+        position = argv.index("--language")
+        if position + 1 >= len(argv):
+            print("--language needs a language code, such as id or en.")
+            return 2
+        language = argv[position + 1]
+
     try:
         quality = find_quality(quality_code)
     except ValueError as error:
         print(error)
-        return 2
-
-    if not media.ffmpeg_available():
-        print("ffmpeg was not found. Install ffmpeg first.")
         return 2
 
     videos = media.find_videos(location)
@@ -63,7 +67,10 @@ def _headless(argv: list[str]) -> int:
     anything_failed = False
     for position, video in enumerate(videos, start=1):
         print(f"[{position}/{len(videos)}] {video.name}")
-        result = process_video(video, quality, report=lambda message: print("   ", message))
+        result = process_video(
+            video, quality, language=language,
+            report=lambda message: print("   ", message, flush=True),
+        )
         if result.error:
             anything_failed = True
             print("    FAILED:", result.error)

@@ -204,14 +204,51 @@ def test_empty_ocr_lines_are_dropped():
 def test_thorough_works_harder_than_fast():
     assert THOROUGH.frame_interval_seconds < FAST.frame_interval_seconds
     assert THOROUGH.min_frame_change < FAST.min_frame_change
+    assert THOROUGH.beam_size > FAST.beam_size
 
 
-def test_every_preset_states_its_download_size():
-    for quality in ALL_QUALITIES:
-        assert quality.download_size.strip()
-        assert find_quality(quality.code) is quality
+def test_every_preset_uses_a_model_the_app_ships():
+    # The packaged app downloads nothing, so a preset naming a model that is
+    # not in the bundle would fail on every user's machine.
+    from video_to_text.core import speech
+
+    for quality in (FAST, THOROUGH):
+        assert speech.model_available(quality.speech_model), quality.speech_model
 
 
 def test_an_unknown_preset_is_refused():
     with pytest.raises(ValueError):
         find_quality("very-thorough")
+
+
+# --- writing only what is new on screen ----------------------------------------
+
+from video_to_text.core.screen import new_lines  # noqa: E402
+
+
+def test_a_title_that_stays_on_screen_is_not_repeated():
+    before = "Can AI find Apple's hidden rule?\nTHERE'S A GITHUB PROJECT"
+    after = "Can AI find Apple's hidden rule?\nVIRAL"
+    assert new_lines(after, before) == "VIRAL"
+
+
+def test_a_line_read_slightly_differently_is_still_recognised():
+    before = "Can Al find Apple's hidden rule?"
+    after = "Can AI find Apples hidden rule?\nSHORT FOR REVERSE"
+    assert new_lines(after, before) == "SHORT FOR REVERSE"
+
+
+def test_a_changed_number_is_written_again():
+    before = "Discovered 8,046 items"
+    after = "Discovered 8,312 items"
+    assert new_lines(after, before) == "Discovered 8,312 items"
+
+
+def test_a_completely_new_screen_is_written_whole():
+    assert new_lines("Bab 2\nRumus umur", "Bab 1\nPendahuluan") == "Bab 2\nRumus umur"
+
+
+def test_the_latin_ocr_model_ships_with_the_app():
+    from video_to_text.core.screen import latin_model_path
+
+    assert latin_model_path().is_file()

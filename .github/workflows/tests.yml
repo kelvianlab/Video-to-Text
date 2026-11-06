@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install the exact library versions the app ships with
+        run: pip install -r requirements-build.txt
+
+      # The models are about 475 MB. Cached so each run does not fetch them again.
+      - uses: actions/cache@v4
+        with:
+          path: model
+          key: models-small-ocr-v1
+
+      - name: Fetch the models the app bundles
+        run: python packaging/fetch_models.py small
+
+      - name: Run the test suite
+        run: python -m pytest -q

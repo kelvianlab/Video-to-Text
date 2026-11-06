@@ -13,11 +13,20 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from .core import media
+from . import __version__
+from .core import media, speech
 from .core.pipeline import process_video
 from .core.settings import ALL_QUALITIES, FAST, THOROUGH
 
-VERSION = "1.0.0"
+# What the user picks -> what Whisper is told. "Otomatis" still only chooses
+# between English and Indonesian (see speech.choose_language), the two
+# languages the app is built for.
+LANGUAGES = {
+    "Otomatis (Inggris/Indonesia)": None,
+    "Inggris": "en",
+    "Indonesia": "id",
+}
+
 GREEN = "#1b7f3b"
 ORANGE = "#b25e00"
 RED = "#b3261e"
@@ -31,13 +40,14 @@ def _shorten(text: str, width: int = 86) -> str:
 class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title(f"Video ke Teks {VERSION}")
+        self.title(f"Video ke Teks {__version__}")
         self.minsize(720, 0)
         self.resizable(True, False)
 
         self.location = tk.StringVar()
         self.quality = tk.StringVar(value=FAST.code)
         self.use_gpu = tk.BooleanVar(value=True)
+        self.language = tk.StringVar(value="Otomatis (Inggris/Indonesia)")
         self.quality_note = tk.StringVar(value=FAST.explanation)
         self.status = tk.StringVar(value="Pilih video atau folder, lalu tekan Mulai.")
         self.detail = tk.StringVar(value=" ")
@@ -91,7 +101,24 @@ class App(tk.Tk):
         ttk.Label(
             frame, textvariable=self.quality_note, foreground=GREY,
             wraplength=660, justify="left",
-        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(2, 12))
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(2, 8))
+
+        speech_row = ttk.Frame(frame)
+        speech_row.grid(row=6, column=0, columnspan=3, sticky="w")
+        ttk.Label(speech_row, text="Bahasa yang diucapkan di video:").pack(side="left")
+        self.language_box = ttk.Combobox(
+            speech_row, textvariable=self.language, values=list(LANGUAGES),
+            state="readonly", width=28,
+        )
+        self.language_box.pack(side="left", padx=(8, 0))
+        ttk.Label(
+            frame,
+            text=(
+                "Otomatis memilih sendiri antara Inggris dan Indonesia. Hasilnya ditulis dalam "
+                "bahasa yang diucapkan. Bahasa lain belum didukung."
+            ),
+            foreground=GREY, wraplength=660, justify="left",
+        ).grid(row=7, column=0, columnspan=3, sticky="w", pady=(2, 12))
 
         ttk.Label(
             frame,
@@ -101,10 +128,10 @@ class App(tk.Tk):
                 "dikirim ke internet dan tidak diubah."
             ),
             foreground=GREY, wraplength=660, justify="left",
-        ).grid(row=6, column=0, columnspan=3, sticky="w", pady=(0, 12))
+        ).grid(row=8, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=7, column=0, columnspan=3, sticky="w")
+        buttons.grid(row=9, column=0, columnspan=3, sticky="w")
         self.start_button = ttk.Button(buttons, text="3.  Mulai", command=self._start)
         self.start_button.pack(side="left", ipadx=14, ipady=4)
         self.stop_button = ttk.Button(
@@ -113,19 +140,19 @@ class App(tk.Tk):
         self.stop_button.pack(side="left", padx=8, ipady=4)
 
         self.bar = ttk.Progressbar(frame, mode="determinate", maximum=100)
-        self.bar.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(14, 6))
+        self.bar.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(14, 6))
         self.status_label = ttk.Label(frame, textvariable=self.status, font=bold, wraplength=660)
-        self.status_label.grid(row=9, column=0, columnspan=3, sticky="w")
+        self.status_label.grid(row=11, column=0, columnspan=3, sticky="w")
         ttk.Label(frame, textvariable=self.detail, foreground=GREY).grid(
-            row=10, column=0, columnspan=3, sticky="w", pady=(2, 8)
+            row=12, column=0, columnspan=3, sticky="w", pady=(2, 8)
         )
 
         self.summary = tk.Text(frame, height=9, wrap="word", relief="flat", background="#f6f6f6")
-        self.summary.grid(row=11, column=0, columnspan=3, sticky="ew")
+        self.summary.grid(row=13, column=0, columnspan=3, sticky="ew")
         self.summary.configure(state="disabled")
 
         afterwards = ttk.Frame(frame)
-        afterwards.grid(row=12, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        afterwards.grid(row=14, column=0, columnspan=3, sticky="w", pady=(10, 0))
         self.open_button = ttk.Button(
             afterwards, text="Buka folder hasil", command=self._open_folder, state="disabled"
         )
@@ -161,6 +188,9 @@ class App(tk.Tk):
         state = "disabled" if running else "normal"
         for button in (self.start_button, self.pick_video_button, self.pick_folder_button):
             button.configure(state=state)
+        # The language is read once when a run starts; locking the box keeps
+        # what is on screen the same as what is being used.
+        self.language_box.configure(state="disabled" if running else "readonly")
         self.stop_button.configure(state="normal" if running else "disabled")
 
     def _start(self) -> None:
@@ -168,15 +198,6 @@ class App(tk.Tk):
         if not location:
             messagebox.showinfo("Video ke Teks", "Pilih video atau folder dulu.")
             return
-        if not media.ffmpeg_available():
-            messagebox.showerror(
-                "Video ke Teks",
-                "ffmpeg tidak ditemukan di komputer ini.\n\n"
-                "Aplikasi ini memakai ffmpeg untuk membaca video. Pasang dulu ffmpeg, "
-                "lalu buka aplikasi ini lagi.",
-            )
-            return
-
         videos = media.find_videos(Path(location))
         if not videos:
             messagebox.showwarning(
@@ -187,14 +208,20 @@ class App(tk.Tk):
             return
 
         preset = THOROUGH if self.quality.get() == THOROUGH.code else FAST
-        if not messagebox.askyesno(
-            "Video ke Teks",
-            f"{len(videos)} video akan dikerjakan dengan mutu {preset.label}.\n\n"
-            f"Kalau model suara {preset.speech_model} belum ada di komputer ini, "
-            f"model itu diunduh dulu sekitar {preset.download_size}. Unduhan hanya sekali.\n\n"
-            "Lanjutkan?",
-        ):
+        if not speech.model_available(preset.speech_model):
+            messagebox.showerror(
+                "Video ke Teks",
+                f"Model suara untuk mutu {preset.label} tidak ada di dalam aplikasi.\n\n"
+                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya.",
+            )
             return
+        # Every choice is read here, on the window's own thread, and handed to
+        # the worker as plain values. Tk variables must not be touched from the
+        # worker thread: when the window's event loop is not running that
+        # raises "main thread is not in main loop", and even when it is, it
+        # depends on Tcl being built with thread support.
+        language = LANGUAGES[self.language.get()]
+        use_gpu = bool(self.use_gpu.get())
 
         self._stop_requested.clear()
         self._results = []
@@ -204,10 +231,12 @@ class App(tk.Tk):
         self.bar["value"] = 0
         self._lock(True)
 
-        self._worker = threading.Thread(target=self._work, args=(videos, preset), daemon=True)
+        self._worker = threading.Thread(
+            target=self._work, args=(videos, preset, language, use_gpu), daemon=True
+        )
         self._worker.start()
 
-    def _work(self, videos, preset) -> None:
+    def _work(self, videos, preset, language, use_gpu) -> None:
         try:
             for position, video in enumerate(videos, start=1):
                 if self._stop_requested.is_set():
@@ -216,7 +245,8 @@ class App(tk.Tk):
                 result = process_video(
                     video,
                     preset,
-                    use_gpu=self.use_gpu.get(),
+                    use_gpu=use_gpu,
+                    language=language,
                     report=lambda message: self._messages.put(("detail", message)),
                     should_stop=self._stop_requested.is_set,
                 )

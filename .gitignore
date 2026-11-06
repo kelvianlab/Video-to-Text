@@ -9,6 +9,7 @@ venv/
 *.txt
 *.srt
 !README*.txt
+!requirements*.txt
 uji/contoh/
 
 # Model yang diunduh otomatis, besarnya ratusan MB sampai GB
@@ -20,3 +21,7 @@ model/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Hasil pembuatan aplikasi
+build/
+dist/

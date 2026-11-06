@@ -1,0 +1,94 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v. Must match video_to_text/__init__.py (e.g. 1.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: The version asked for is the version in the code
+        shell: pwsh
+        run: |
+          $code = python -c "import video_to_text; print(video_to_text.__version__)"
+          if ($code -ne "${{ inputs.version }}") { throw "asked for ${{ inputs.version }} but the code says $code" }
+
+      - name: Install the exact library versions
+        run: pip install -r requirements-build.txt
+
+      - uses: actions/cache@v4
+        with:
+          path: model
+          key: models-small-ocr-v1
+
+      - name: Fetch the models the app bundles
+        run: python packaging/fetch_models.py small
+
+      - name: Run the test suite first
+        run: python -m pytest -q
+
+      - name: Build the app folder
+        run: python -m PyInstaller --noconfirm --clean --distpath dist --workpath build packaging/video-to-text.spec
+
+      - name: Check the built app hears speech, reads the screen, and opens its window
+        shell: pwsh
+        run: ./packaging/smoke_test.ps1 -AppFolder "dist/Video ke Teks"
+
+      - name: Gather licences and zip
+        run: python packaging/make_zip.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Video-ke-Teks-${{ inputs.version }}-Windows
+          path: dist/Video-ke-Teks-${{ inputs.version }}-Windows.zip
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Video ke Teks ${{ inputs.version }}
+          files: dist/Video-ke-Teks-${{ inputs.version }}-Windows.zip
+          body: |
+            ## Unduh / Download
+
+            ### `Video-ke-Teks-${{ inputs.version }}-Windows.zip` — hanya ini yang perlu diunduh
+
+            1. Unduh berkas zip itu (sekitar 600 MB, karena semua yang dibutuhkan ada di dalamnya).
+            2. Klik kanan, pilih **Extract All**.
+            3. Buka folder `Video ke Teks`, klik dua kali **`Video ke Teks.exe`**.
+
+            Tidak perlu memasang Python, ffmpeg, atau apa pun. Tidak perlu internet.
+            Video tidak dikirim ke mana pun dan tidak diubah.
+
+            Pertama kali, Windows mungkin menampilkan **"Windows protected your PC"**, karena
+            aplikasinya belum bertanda tangan digital. Klik **More info**, lalu **Run anyway**.
+
+            ---
+
+            Download the zip, extract it, and double-click `Video ke Teks.exe`. Nothing to
+            install, no internet needed. If Windows says "Windows protected your PC", click
+            **More info**, then **Run anyway**.
+
+            Reads speech in **English and Indonesian**, and on-screen text, from any video file,
+            with or without subtitles.
+
+            `Source code (zip)` and `(tar.gz)` are added by GitHub automatically. They are not
+            the app; you do not need them.
+
+            Built and checked by GitHub Actions from this exact commit: the test suite ran, then
+            the finished app was run on a test video and had to hear its spoken words and read
+            its on-screen caption before this release was published.

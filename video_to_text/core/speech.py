@@ -1,16 +1,41 @@
 """Turn the video's audio into text with Whisper.
 
-Uses faster-whisper, which does not need PyTorch. An NVIDIA card is used when
-one is genuinely usable; otherwise the work falls back to the processor.
+Uses faster-whisper, which does not need PyTorch. The models travel inside the
+app, so nothing is ever downloaded. An NVIDIA card is used when one genuinely
+works; otherwise the work runs on the processor.
 """
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+# The packaged app must never reach for the internet. Set before faster-whisper
+# or huggingface_hub is imported, because both read these once at import time.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 _loaded_models: dict[tuple[str, str], object] = {}
+
+_gpu_failure: str | None = None
+"""Why the card failed, once it has. A card that failed on the first video
+fails the same way on the next, so the slow check is not repeated."""
+
+
+class _NoCard(Exception):
+    """No NVIDIA card at all: the normal case, not worth a note to the user."""
+
+LANGUAGE_NAMES = {"en": "Inggris", "id": "Indonesia"}
+"""The languages the app is built for. Anything else may still come out, but
+automatic detection never picks it."""
+
+# Whisper often hears Indonesian as Malay: the two share most of their words.
+# Left alone, a whole Indonesian video can come back spelled as Malay. When
+# choosing between the supported languages, Malay's score counts as Indonesian.
+_COUNTS_AS = {"ms": "id"}
 
 
 @dataclass(frozen=True)
@@ -20,145 +45,166 @@ class SpeechSegment:
     text: str
 
 
+@dataclass
+class SpeechResult:
+    segments: list[SpeechSegment]
+    used_gpu: bool
+    language: str = ""
+    language_was_detected: bool = False
+    gpu_note: str | None = None
+    """Why the card was not used after all, when it was asked for and failed."""
+
+
 class SpeechError(Exception):
     """The speech model could not be used."""
 
 
-def gpu_usable() -> bool:
-    """Check that the graphics card really works, not merely that one exists.
+def model_folder() -> Path:
+    """Where the bundled models live.
 
-    This has to run an actual transcription, not just build the model. Building
-    one succeeds on a machine whose CUDA maths libraries are missing, because
-    cuBLAS is only loaded once there is something to compute; the failure then
-    lands in the middle of a real video instead of here.
+    In the packaged app that is inside the app's own folder. When running from
+    source it is the model/ folder at the top of the project, which the build
+    script fills and git ignores.
     """
-    try:
-        import numpy as np
-        from faster_whisper import WhisperModel
-
-        model = WhisperModel("tiny", device="cuda", compute_type="float16")
-        silence = np.zeros(16000, dtype=np.float32)  # one second
-        list(model.transcribe(silence, beam_size=1)[0])
-        return True
-    except Exception:
-        return False
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle:
+        return Path(bundle) / "model"
+    return Path(__file__).resolve().parents[2] / "model"
 
 
-def _import_whisper():
-    """Import faster-whisper, or explain in plain words how to install it.
-
-    A bare ModuleNotFoundError tells a non-technical user nothing, and it is the
-    most likely thing to go wrong: on a machine with several Pythons, the app can
-    start on one that has no components installed.
-    """
-    try:
-        from faster_whisper import WhisperModel
-
-        return WhisperModel
-    except ImportError as error:
-        import sys
-
-        # The original text is kept. An ImportError here is not always a missing
-        # package: a native library that fails to load reports itself the same
-        # way, and hiding that leaves nothing to act on.
-        raise SpeechError(
-            "Komponen pembaca suara tidak bisa dimuat.\n\n"
-            f"Keterangan asli dari Python:\n{type(error).__name__}: {error}\n\n"
-            f"Python yang dipakai sekarang:\n{sys.executable}\n\n"
-            "Kalau keterangan di atas menyebut modul yang hilang, jalankan sekali:\n"
-            f'"{sys.executable}" -m pip install faster-whisper'
-        ) from error
+def model_path(name: str) -> Path:
+    return model_folder() / f"faster-whisper-{name}"
 
 
-def _load_model(name: str, use_gpu: bool):
-    """Prepare a model and keep it, so the next video does not reload it."""
-    device = "cuda" if use_gpu else "cpu"
-    precision = "float16" if use_gpu else "int8"
+def model_available(name: str) -> bool:
+    return (model_path(name) / "model.bin").is_file()
+
+
+def _load(name: str, device: str):
+    from faster_whisper import WhisperModel
+
     key = (name, device)
     if key not in _loaded_models:
-        WhisperModel = _import_whisper()
-
-        try:
-            _loaded_models[key] = WhisperModel(name, device=device, compute_type=precision)
-        except Exception as error:
-            if use_gpu:
-                return _load_model(name, use_gpu=False)
+        location = model_path(name)
+        if not (location / "model.bin").is_file():
             raise SpeechError(
-                f"Model suara {name!r} tidak bisa disiapkan: {str(error)[:200]}"
-            ) from error
+                f"Model suara {name!r} tidak ada di dalam aplikasi.\n"
+                f"Dicari di: {location}\n\n"
+                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
+            )
+        precision = "float16" if device == "cuda" else "int8"
+        _loaded_models[key] = WhisperModel(str(location), device=device, compute_type=precision)
     return _loaded_models[key]
 
 
-def read_wav(wav_file: Path):
-    """Read a 16 kHz mono 16-bit WAV into the float array Whisper expects.
+def _gpu_model(name: str):
+    """Return a working model on the card, or raise with the reason it will not work.
 
-    Doing this here rather than handing Whisper the file path keeps PyAV out of
-    the picture entirely. faster-whisper otherwise decodes the file itself by
-    calling av.open(..., metadata_errors=...), an argument PyAV 19 removed, so
-    the two break against each other even though their declared versions agree.
-    Since media.extract_audio already produced this exact WAV with ffmpeg, there
-    is nothing left for a second decoder to do.
+    The check runs a real transcription of one second of silence. Merely building
+    the model is not enough: CUDA's maths library is only loaded once there is
+    something to compute, so a machine without it passes construction and then
+    fails in the middle of the first real video.
     """
-    import wave
-
+    global _gpu_failure
+    import ctranslate2
     import numpy as np
 
-    with wave.open(str(wav_file), "rb") as handle:
-        if handle.getsampwidth() != 2 or handle.getnchannels() != 1:
-            raise SpeechError(
-                "Berkas suara sementara tidak sesuai dugaan "
-                f"({handle.getnchannels()} kanal, {handle.getsampwidth() * 8} bit)."
-            )
-        frames = handle.readframes(handle.getnframes())
+    if ctranslate2.get_cuda_device_count() == 0:
+        raise _NoCard()
+    if _gpu_failure:
+        raise RuntimeError(_gpu_failure)
+    try:
+        model = _load(name, "cuda")
+        list(model.transcribe(np.zeros(16000, dtype=np.float32), beam_size=1)[0])
+    except SpeechError:
+        raise
+    except Exception as error:
+        _loaded_models.pop((name, "cuda"), None)
+        _gpu_failure = f"{type(error).__name__}: {error}"
+        raise
+    return model
 
-    return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+def choose_language(probabilities) -> str:
+    """Pick English or Indonesian from Whisper's language scores.
+
+    *probabilities* is the (code, probability) list Whisper returns. Only the
+    supported languages compete, so a mixed Indonesian and English video can no
+    longer be labelled as some third language.
+    """
+    scores = dict.fromkeys(LANGUAGE_NAMES, 0.0)
+    for code, probability in probabilities:
+        code = _COUNTS_AS.get(code, code)
+        if code in scores:
+            scores[code] += float(probability)
+    return max(scores, key=scores.get)
+
+
+def _pick_language(model, audio, language: str | None) -> tuple[str, bool]:
+    if language:
+        return language, False
+    _, _, probabilities = model.detect_language(
+        audio, vad_filter=True, language_detection_segments=3
+    )
+    return choose_language(probabilities), True
 
 
 def transcribe(
-    wav_file: Path,
+    audio,
     model_name: str,
     use_gpu: bool = True,
     language: str | None = None,
     report: Callable[[float], None] | None = None,
-    on_gpu_failure: Callable[[str], None] | None = None,
-) -> list[SpeechSegment]:
-    """Turn audio into timed segments of speech.
+    beam_size: int = 5,
+) -> SpeechResult:
+    """Turn 16 kHz mono float audio into timed segments of speech.
 
-    *report* is called with the last second finished, so the window can show
-    progress while the work runs. *on_gpu_failure* is called with the reason if
-    the graphics card gives out and the work moves to the processor.
+    *language* is "en" or "id" to name it outright, or None to choose between
+    those two automatically. *report* is called with the last second finished,
+    so the window can show progress while the work runs.
     """
-    audio = read_wav(wav_file)
+    gpu_note = None
+    if use_gpu:
+        try:
+            model = _gpu_model(model_name)
+            chosen, detected = _pick_language(model, audio, language)
+            return SpeechResult(
+                _run(model, audio, chosen, report, beam_size), used_gpu=True,
+                language=chosen, language_was_detected=detected,
+            )
+        except SpeechError:
+            raise
+        except _NoCard:
+            pass  # most computers; the processor simply does the work
+        except Exception as error:
+            # A card that is there but will not work, or one that gave out
+            # part-way. Either way the work still has to finish, and the user
+            # is told why the card they asked for was not used.
+            gpu_note = f"{type(error).__name__}: {error}"
+
     try:
-        return _run(audio, model_name, use_gpu, language, report)
-    except RuntimeError as error:
-        if not use_gpu:
-            raise SpeechError(
-                f"Pembacaan suara gagal.\n\nKeterangan asli:\n{error}"
-            ) from error
-        # The card passed its check but gave out part-way through. The work still
-        # has to finish, so it moves to the processor, and the caller is told so
-        # the report does not claim a card did work it did not do.
-        if on_gpu_failure:
-            on_gpu_failure(str(error))
-        return _run(audio, model_name, use_gpu=False, language=language, report=report)
+        model = _load(model_name, "cpu")
+        chosen, detected = _pick_language(model, audio, language)
+        segments = _run(model, audio, chosen, report, beam_size)
+    except SpeechError:
+        raise
+    except Exception as error:
+        raise SpeechError(
+            f"Pembacaan suara gagal.\n\nKeterangan asli:\n{type(error).__name__}: {error}"
+        ) from error
+    return SpeechResult(
+        segments, used_gpu=False, gpu_note=gpu_note,
+        language=chosen, language_was_detected=detected,
+    )
 
 
-def _run(
-    audio,
-    model_name: str,
-    use_gpu: bool,
-    language: str | None,
-    report: Callable[[float], None] | None,
-) -> list[SpeechSegment]:
-    model = _load_model(model_name, use_gpu)
+def _run(model, audio, language, report, beam_size) -> list[SpeechSegment]:
     segments, _ = model.transcribe(
         audio,
         language=language,
-        vad_filter=True,
-        beam_size=5,
+        vad_filter=True,   # skips silence and music, where Whisper invents text
+        beam_size=beam_size,
     )
-
     found: list[SpeechSegment] = []
     for segment in segments:
         text = (segment.text or "").strip()
