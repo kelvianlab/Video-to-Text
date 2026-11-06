@@ -1,6 +1,8 @@
 name: release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -10,6 +12,10 @@ on:
 
 permissions:
   contents: write
+
+env:
+  # From the form when started by hand, from the tag (v1.1.0 -> 1.1.0) when a tag is pushed.
+  RAW_VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
   build:
@@ -24,8 +30,10 @@ jobs:
       - name: The version asked for is the version in the code
         shell: pwsh
         run: |
+          $wanted = "$env:RAW_VERSION".TrimStart("v")
+          "VERSION=$wanted" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $code = python -c "import video_to_text; print(video_to_text.__version__)"
-          if ($code -ne "${{ inputs.version }}") { throw "asked for ${{ inputs.version }} but the code says $code" }
+          if ($code -ne $wanted) { throw "asked for $wanted but the code says $code" }
 
       - name: Install the exact library versions
         run: pip install -r requirements-build.txt
@@ -53,19 +61,19 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Video-ke-Teks-${{ inputs.version }}-Windows
-          path: dist/Video-ke-Teks-${{ inputs.version }}-Windows.zip
+          name: Video-ke-Teks-${{ env.VERSION }}-Windows
+          path: dist/Video-ke-Teks-${{ env.VERSION }}-Windows.zip
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: Video ke Teks ${{ inputs.version }}
-          files: dist/Video-ke-Teks-${{ inputs.version }}-Windows.zip
+          tag_name: v${{ env.VERSION }}
+          name: Video ke Teks ${{ env.VERSION }}
+          files: dist/Video-ke-Teks-${{ env.VERSION }}-Windows.zip
           body: |
             ## Unduh / Download
 
-            ### `Video-ke-Teks-${{ inputs.version }}-Windows.zip` — hanya ini yang perlu diunduh
+            ### `Video-ke-Teks-${{ env.VERSION }}-Windows.zip` — hanya ini yang perlu diunduh
 
             1. Unduh berkas zip itu (sekitar 600 MB, karena semua yang dibutuhkan ada di dalamnya).
             2. Klik kanan, pilih **Extract All**.
