@@ -16,7 +16,7 @@ from importlib import metadata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "dist" / "Video ke Teks"
+APP = ROOT / "dist" / "Video to Text"
 INTERNAL = APP / "_internal"
 LICENSES = INTERNAL / "licenses"
 
@@ -123,10 +123,10 @@ def main() -> int:
         rows.append((name, dist.version, licence_text(dist), where))
 
     lines = [
-        "Video ke Teks - third-party notices",
+        "Video to Text - third-party notices",
         "=" * 36,
         "",
-        "Video ke Teks itself is released under the MIT licence (see LICENSE.txt).",
+        "Video to Text itself is released under the MIT licence (see LICENSE.txt).",
         "The app folder also carries the following work by others, each under its",
         "own licence. Licence texts that the components ship with are copied into",
         "_internal/licenses/. Nothing here was modified.",

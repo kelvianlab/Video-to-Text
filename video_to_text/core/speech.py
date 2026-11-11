@@ -28,7 +28,7 @@ fails the same way on the next, so the slow check is not repeated."""
 class _NoCard(Exception):
     """No NVIDIA card at all: the normal case, not worth a note to the user."""
 
-LANGUAGE_NAMES = {"en": "Inggris", "id": "Indonesia"}
+LANGUAGE_NAMES = {"en": "English", "id": "Indonesian"}
 """The languages the app is built for. Anything else may still come out, but
 automatic detection never picks it."""
 
@@ -88,9 +88,9 @@ def _load(name: str, device: str):
         location = model_path(name)
         if not (location / "model.bin").is_file():
             raise SpeechError(
-                f"Model suara {name!r} tidak ada di dalam aplikasi.\n"
-                f"Dicari di: {location}\n\n"
-                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
+                f"The speech model {name!r} is missing from the app.\n"
+                f"Looked in: {location}\n\n"
+                "The app folder may be incomplete. Extract it again from the original zip."
             )
         precision = "float16" if device == "cuda" else "int8"
         _loaded_models[key] = WhisperModel(str(location), device=device, compute_type=precision)
@@ -190,7 +190,7 @@ def transcribe(
         raise
     except Exception as error:
         raise SpeechError(
-            f"Pembacaan suara gagal.\n\nKeterangan asli:\n{type(error).__name__}: {error}"
+            f"Reading the speech failed.\n\nOriginal error:\n{type(error).__name__}: {error}"
         ) from error
     return SpeechResult(
         segments, used_gpu=False, gpu_note=gpu_note,

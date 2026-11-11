@@ -16,7 +16,7 @@ import av
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-CAPTION = "VIDEO KE TEKS SIAP"
+CAPTION = "VIDEO TO TEXT READY"
 FPS = 10
 
 

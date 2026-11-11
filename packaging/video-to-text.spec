@@ -1,6 +1,6 @@
 # PyInstaller recipe for the self-contained Windows app.
 #
-# The result is one folder holding "Video ke Teks.exe" and everything it needs:
+# The result is one folder holding "Video to Text.exe" and everything it needs:
 # Python itself, every library, the video decoder, the OCR models, and the
 # speech models. Nothing is installed and nothing is downloaded when it runs.
 #
@@ -66,7 +66,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Video ke Teks",
+    name="Video to Text",
     console=False,
     upx=False,   # UPX-packed DLLs are a common antivirus false positive
 )
@@ -76,5 +76,5 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     upx=False,
-    name="Video ke Teks",
+    name="Video to Text",
 )

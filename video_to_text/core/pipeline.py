@@ -39,21 +39,27 @@ class VideoResult:
     notes: list[str] = field(default_factory=list)
 
 
+def counted(number: int, singular: str, plural: str | None = None) -> str:
+    """"1 piece", "2 pieces": English needs the count and the noun to agree."""
+    return f"{number} {singular if number == 1 else (plural or singular + 's')}"
+
+
 def _summary(quality: Quality, result: VideoResult) -> str:
     """One line describing how the result was produced. Shown to the user."""
     if not result.had_audio:
-        speech_part = "Video tanpa suara, jadi hanya tulisan layar yang dibaca."
+        speech_part = "Video has no sound, so only the screen text was read."
     else:
-        device = "kartu grafis NVIDIA" if result.used_gpu else "prosesor (CPU)"
+        device = "NVIDIA graphics card" if result.used_gpu else "processor (CPU)"
         name = speech.LANGUAGE_NAMES.get(result.language, result.language)
-        how = "dipilih otomatis" if result.language_was_detected else "dipilih pengguna"
+        how = "chosen automatically" if result.language_was_detected else "chosen by user"
         speech_part = (
-            f"Suara berbahasa {name} ({how}), dibaca model {quality.speech_model} "
-            f"dengan {device}: {result.speech_count} potongan."
+            f"Speech in {name} ({how}), read by the {quality.speech_model} model "
+            f"on the {device}: {counted(result.speech_count, 'piece')}."
         )
     return (
-        f"Mutu: {quality.label}. {speech_part} "
-        f"Layar: {result.screen_count} tampilan dari {result.frames_checked} gambar."
+        f"Quality: {quality.label}. {speech_part} "
+        f"Screen: {counted(result.screen_count, 'entry', 'entries')} "
+        f"from {counted(result.frames_checked, 'picture')}."
     )
 
 
@@ -78,20 +84,20 @@ def process_video(
 
         speech_segments: list = []
         if details.has_audio:
-            say("Mengambil suara dari video...")
+            say("Taking the sound from the video...")
             audio = media.load_audio(video)
             if stop_now():
-                result.error = "Dihentikan oleh pengguna."
+                result.error = "Stopped by the user."
                 return result
 
-            say("Membaca suara menjadi teks...")
+            say("Turning speech into text...")
             speech_result = speech.transcribe(
                 audio,
                 quality.speech_model,
                 use_gpu=use_gpu,
                 language=language,
                 beam_size=quality.beam_size,
-                report=lambda second: say(f"Membaca suara... detik ke-{int(second)}"),
+                report=lambda second: say(f"Reading speech... second {int(second)}"),
             )
             speech_segments = speech_result.segments
             result.used_gpu = speech_result.used_gpu
@@ -99,29 +105,29 @@ def process_video(
             result.language_was_detected = speech_result.language_was_detected
             if speech_result.gpu_note:
                 result.notes.append(
-                    "Kartu grafis NVIDIA ada tetapi belum bisa dipakai, jadi suara dibaca "
-                    "dengan prosesor. Hasilnya sama, hanya lebih lambat. "
-                    f"Keterangan teknis: {speech_result.gpu_note[:120]}"
+                    "An NVIDIA graphics card is present but could not be used, so the "
+                    "processor read the speech. Same result, just slower. "
+                    f"Technical detail: {speech_result.gpu_note[:120]}"
                 )
         else:
-            result.notes.append("Video ini tidak punya suara, jadi hanya layar yang dibaca.")
+            result.notes.append("This video has no sound, so only the screen was read.")
 
         if stop_now():
-            result.error = "Dihentikan oleh pengguna."
+            result.error = "Stopped by the user."
             return result
 
-        say("Mengambil gambar layar...")
+        say("Taking screen pictures...")
         frames = media.extract_frames(
             video, workspace / "frames", quality.frame_interval_seconds
         )
         result.frames_checked = len(frames)
 
-        say("Membaca tulisan di layar...")
+        say("Reading the text on screen...")
         counter = {"read": 0}
 
         def report_screens(done: int, total: int, read_so_far: int) -> None:
             counter["read"] = read_so_far
-            say(f"Membaca tulisan layar... gambar {done} dari {total}")
+            say(f"Reading screen text... picture {done} of {total}")
 
         screen_segments = screen.read_screens(
             frames,
@@ -136,7 +142,7 @@ def process_video(
         result.screen_count = len(screen_segments)
 
         lines: list[Line] = merge(speech_segments, screen_segments)
-        say("Menyimpan hasil...")
+        say("Saving the results...")
         result.txt_file, result.srt_file = save(video, lines, _summary(quality, result))
         return result
 

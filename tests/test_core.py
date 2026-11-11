@@ -54,10 +54,10 @@ def test_speech_comes_first_when_both_start_together():
 
 
 def test_each_line_is_labelled_with_where_it_came_from():
-    lines = merge([Segment(0.0, 1.0, "halo")], [Segment(0.0, 1.0, "judul")])
-    body = build_txt(lines, "contoh.mp4", "summary")
-    assert "[SUARA] halo" in body
-    assert "[LAYAR] judul" in body
+    lines = merge([Segment(0.0, 1.0, "hello")], [Segment(0.0, 1.0, "title")])
+    body = build_txt(lines, "sample.mp4", "summary")
+    assert "[SPEECH] hello" in body
+    assert "[SCREEN] title" in body
 
 
 @pytest.mark.parametrize(
@@ -95,20 +95,20 @@ def test_the_name_keeps_climbing_on_repeated_runs(tmp_path):
 
 
 def test_srt_is_shaped_the_way_a_player_expects():
-    lines = [Line(1.0, 2.5, HEARD, "halo semua"), Line(3.0, 3.0, SHOWN, "judul")]
+    lines = [Line(1.0, 2.5, HEARD, "hello everyone"), Line(3.0, 3.0, SHOWN, "title")]
     body = build_srt(lines).splitlines()
 
     assert body[0] == "1"
     assert body[1] == "00:00:01,000 --> 00:00:02,500"
-    assert body[2] == "[SUARA] halo semua"
+    assert body[2] == "[SPEECH] hello everyone"
     # a subtitle with no duration never appears, so it is given the shortest one
     assert body[5] == "00:00:03,000 --> 00:00:03,500"
 
 
 def test_txt_says_plainly_that_the_result_is_only_an_estimate():
-    body = build_txt([], "contoh.mp4", "summary")
-    assert "perkiraan" in body.lower()
-    assert "tidak ada suara maupun tulisan layar yang terbaca" in body
+    body = build_txt([], "sample.mp4", "summary")
+    assert "best guess" in body.lower()
+    assert "no speech or screen text could be read" in body
 
 
 # --- not writing the same screen twice ------------------------------------
@@ -153,12 +153,12 @@ def test_default_thresholds_sit_below_real_measured_change():
 
 
 def test_the_same_words_with_different_spacing_count_as_the_same():
-    assert same_screen("Halo   Dunia", "halo dunia")
+    assert same_screen("Hello   World", "hello world")
 
 
 def test_one_misread_letter_still_counts_as_the_same_screen():
-    right = "Pilih folder sumber dan tujuan, lalu tekan Mulai Salin sekarang juga ya"
-    misread = "Pilih folder sumber dan tujuan, lalu tekan Mulai Satin sekarang juga ya"
+    right = "Pick the source and target folders, then press Start Copy right now please"
+    misread = "Pick the source and target folders, then press Start Capy right now please"
     assert same_screen(right, misread)
 
 
@@ -169,11 +169,11 @@ def test_a_letter_misread_as_a_digit_is_deliberately_treated_as_different():
     duplicate line. That was chosen on purpose: a spare line costs less than a
     changed number vanishing without trace.
     """
-    assert not same_screen("tekan Mulai Salin", "tekan Mulai Sa1in")
+    assert not same_screen("press Start Copy all", "press Start Copy a1l")
 
 
 def test_genuinely_different_screens_are_not_merged():
-    assert not same_screen("Menyalin berkas pertama", "Proses selesai tanpa galat")
+    assert not same_screen("Copying the first file", "Finished without errors")
 
 
 def test_a_climbing_counter_is_recorded_as_a_new_screen():
@@ -192,11 +192,11 @@ def test_digits_are_read_without_their_grouping_marks():
 
 
 def test_a_changing_countdown_also_counts_as_a_new_screen():
-    assert not same_screen("Time remaining: 2 menit", "Time remaining: 1 menit")
+    assert not same_screen("Time remaining: 2 minutes", "Time remaining: 1 minutes")
 
 
 def test_empty_ocr_lines_are_dropped():
-    assert tidy_text(["  ", "Baris satu", "", "Baris dua  "]) == "Baris satu\nBaris dua"
+    assert tidy_text(["  ", "Line one", "", "Line two  "]) == "Line one\nLine two"
 
 
 # --- the quality presets --------------------------------------------------
@@ -252,3 +252,12 @@ def test_the_latin_ocr_model_ships_with_the_app():
     from video_to_text.core.screen import latin_model_path
 
     assert latin_model_path().is_file()
+
+
+def test_counts_agree_with_their_noun():
+    from video_to_text.core.pipeline import counted
+
+    assert counted(1, "piece") == "1 piece"
+    assert counted(3, "piece") == "3 pieces"
+    assert counted(1, "entry", "entries") == "1 entry"
+    assert counted(0, "entry", "entries") == "0 entries"

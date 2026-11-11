@@ -1,5 +1,5 @@
 @echo off
-REM Builds the self-contained app into dist\Video ke Teks, then zips it.
+REM Builds the self-contained app into dist\Video to Text, then zips it.
 REM For whoever makes a release. People who only want to use the app download
 REM the finished zip and never run this.
 REM
@@ -10,19 +10,19 @@ cd /d "%~dp0\.."
 setlocal
 set "PY=py -3.14"
 
-%PY% -m pip install -r requirements-build.txt || goto gagal
-%PY% packaging\fetch_models.py small || goto gagal
-%PY% -m pytest -q || goto gagal
-%PY% -m PyInstaller --noconfirm --clean --distpath dist --workpath build packaging\video-to-text.spec || goto gagal
-%PY% packaging\make_zip.py || goto gagal
+%PY% -m pip install -r requirements-build.txt || goto failed
+%PY% packaging\fetch_models.py small || goto failed
+%PY% -m pytest -q || goto failed
+%PY% -m PyInstaller --noconfirm --clean --distpath dist --workpath build packaging\video-to-text.spec || goto failed
+%PY% packaging\make_zip.py || goto failed
 
 echo.
-echo Selesai. Hasilnya ada di folder dist.
+echo Done. The result is in the dist folder.
 endlocal
 exit /b 0
 
-:gagal
+:failed
 echo.
-echo Pembuatan gagal. Lihat pesan di atas.
+echo Build failed. See the messages above.
 endlocal
 exit /b 1

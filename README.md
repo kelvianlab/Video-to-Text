@@ -5,23 +5,16 @@
 Runs on your own computer. Your video is never uploaded and never modified.
 It works on any video file you have, whether or not it ever had subtitles.
 
-The app's window is in Indonesian, because it was built for Indonesian users.
-
 ---
 
 ## Download and use
 
-> **Bahasa Indonesia:** unduh `Video-ke-Teks-…-Windows.zip` dari halaman
-> [Releases](../../releases/latest), klik kanan lalu **Extract All**, buka folder
-> `Video ke Teks`, lalu klik dua kali **`Video ke Teks.exe`**. Tidak perlu memasang
-> Python, ffmpeg, atau apa pun. Tidak perlu internet.
-
-1. Download **`Video-ke-Teks-<version>-Windows.zip`** from the
+1. Download **`Video-to-Text-<version>-Windows.zip`** from the
    [Releases](../../releases/latest) page. It is about 600 MB, because everything the
    app needs is inside it.
 2. Right-click the zip and choose **Extract All**. Keep the extracted folder together;
    the `.exe` needs the `_internal` folder next to it.
-3. Open the folder and double-click **`Video ke Teks.exe`**.
+3. Open the folder and double-click **`Video to Text.exe`**.
 
 Nothing to install, nothing else to download, no internet needed. Python, the video
 decoder, and both reading models all travel inside the folder.
@@ -33,9 +26,9 @@ then **Run anyway**. Windows asks only once.
 ### In the window
 
 1. **Pick a video**, or a folder of videos (they are done one by one).
-2. **Pick Cepat or Teliti** (fast or thorough, see below).
+2. **Pick Fast or Thorough** (see below).
 3. **Pick the spoken language**, or leave it on automatic.
-4. Press **Mulai**.
+4. Press **Start**.
 
 The results land next to the video: a `.txt` to read, and a `.srt` that any video
 player can load as subtitles. A file that is already there is **never overwritten**;
@@ -44,18 +37,17 @@ if the name is taken the result gets a number, for example `video (2).txt`.
 ## What the result looks like
 
 ```
-[00:00:00] [SUARA] Gila kamu Mas, kamu yang gila!
-[00:00:05] [LAYAR] Ultra
-                    Claude Code included
-                    No 5-hour limit
-[00:00:10] [SUARA] Itu adalah contoh drama, teman-teman.
-[00:00:21] [LAYAR] CHATGPT
-                    CLAUDE
-[00:00:23] [LAYAR] GEMINI
-                    DEEPSEEK
+[00:00:00] [SPEECH] There's a GitHub project that's gone completely viral in the last week or so.
+[00:00:01] [SCREEN] Can AI find Apple's hidden rule?
+                    Reverse engineer anything with agents, from app behavior down to native
+                    binaries.
+[00:00:02] [SPEECH] It's called REA, short for Reverse Engineer Anything,
+[00:00:05] [SCREEN] SHORT FOR REVERSE
+                    ENGINEER
+[00:00:05] [SPEECH] and over 200,000 developers have already started.
 ```
 
-`SUARA` is what was heard, `LAYAR` is what was shown. Each screen entry holds only the
+`SPEECH` is what was heard, `SCREEN` is what was shown. Each screen entry holds only the
 lines that were new at that moment, so a title that stays on screen for the whole video
 is written once, not once a second.
 
@@ -70,12 +62,12 @@ share most of their words, and a whole Indonesian video can come back spelled as
 Malay. Choosing between English and Indonesian alone, with Malay counted as
 Indonesian, removes that mistake. Other languages are not supported.
 
-## Cepat or Teliti
+## Fast or Thorough
 
-Both use the same speech model. Teliti searches harder for the right wording and
+Both use the same speech model. Thorough searches harder for the right wording and
 looks at the screen twice as often.
 
-| | Cepat (fast) | Teliti (thorough) |
+| | Fast | Thorough |
 |---|---|---|
 | Speech | narrow search | wide search, better with names and rare words |
 | Screen picture taken every | 2 seconds | 1 second |
@@ -135,7 +127,7 @@ packaging\build.bat
 This installs the exact library versions in `requirements.txt`, fetches the models,
 runs the tests, builds the app folder with PyInstaller, gathers every bundled
 component's licence into it, and zips it. The result is
-`dist\Video-ke-Teks-<version>-Windows.zip`.
+`dist\Video-to-Text-<version>-Windows.zip`.
 
 The app is one folder rather than one `.exe` on purpose. A single `.exe` this size
 unpacks several hundred MB to the temp folder on every launch, which takes tens of
@@ -148,7 +140,7 @@ video_to_text/
   __main__.py        entry point, with or without the window
   window.py          the window; every string the user sees lives here
   core/
-    settings.py      the numbers that separate Cepat from Teliti
+    settings.py      the numbers that separate Fast from Thorough
     media.py         reading the video: details, sound, screen pictures (PyAV)
     speech.py        Whisper, the bundled model, choosing the language
     screen.py        OCR, and the filters that stop repeats

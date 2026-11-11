@@ -40,7 +40,7 @@ def _open(video: Path):
     try:
         return av.open(str(video), mode="r")
     except Exception as error:
-        raise MediaError(f"Video tidak bisa dibuka: {type(error).__name__}: {error}") from error
+        raise MediaError(f"The video cannot be opened: {type(error).__name__}: {error}") from error
 
 
 def find_videos(location: Path) -> list[Path]:
@@ -95,7 +95,7 @@ def load_audio(video: Path):
     with _open(video) as container:
         stream = next((s for s in container.streams if s.type == "audio"), None)
         if stream is None:
-            raise MediaError("Video ini tidak punya suara.")
+            raise MediaError("This video has no sound.")
 
         resampler = av.AudioResampler(format="s16", layout="mono", rate=SPEECH_SAMPLE_RATE)
         pieces = []
@@ -106,7 +106,7 @@ def load_audio(video: Path):
             pieces.append(converted.to_ndarray().reshape(-1))
 
     if not pieces:
-        raise MediaError("Suara di video ini tidak bisa dibaca sama sekali.")
+        raise MediaError("The sound in this video cannot be read at all.")
     return np.concatenate(pieces).astype(np.float32) / 32768.0
 
 
@@ -135,7 +135,7 @@ def extract_frames(
     with _open(video) as container:
         stream = next((s for s in container.streams if s.type == "video"), None)
         if stream is None:
-            raise MediaError("Video ini tidak punya gambar.")
+            raise MediaError("This video has no picture.")
         stream.thread_type = "AUTO"  # decode on every core
 
         # Sample the middle of each slice, as the old ffmpeg fps filter did. The

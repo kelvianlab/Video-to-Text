@@ -1,7 +1,7 @@
 """Merge what was heard and what was shown into one list, in time order.
 
-Every line is labelled SUARA (heard) or LAYAR (shown) so a reader knows where
-it came from. When both start at the same second, SUARA goes first, because the
+Every line is labelled SPEECH (heard) or SCREEN (shown) so a reader knows where
+it came from. When both start at the same second, SPEECH goes first, because the
 speaker is usually explaining what is on the screen.
 """
 
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-HEARD = "SUARA"
-SHOWN = "LAYAR"
+HEARD = "SPEECH"
+SHOWN = "SCREEN"
 
 _LABEL_ORDER = {HEARD: 0, SHOWN: 1}
 

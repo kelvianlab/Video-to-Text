@@ -15,9 +15,9 @@ class Quality:
 
     code: str
     label: str
-    """Shown on the radio button, in Indonesian."""
+    """Shown on the radio button."""
     explanation: str
-    """Shown under the radio buttons, in Indonesian."""
+    """Shown under the radio buttons."""
 
     # Speech side
     speech_model: str
@@ -52,10 +52,10 @@ class Quality:
 
 FAST = Quality(
     code="fast",
-    label="Cepat",
+    label="Fast",
     explanation=(
-        "Hampir dua kali lebih cepat. Cocok untuk melihat isi video secara garis "
-        "besar. Nama dan istilah yang jarang dipakai lebih sering salah dengar."
+        "Almost twice as quick. Good for getting the gist of a video. Names and "
+        "rarely used terms are misheard more often."
     ),
     speech_model="small",
     beam_size=1,
@@ -66,11 +66,10 @@ FAST = Quality(
 
 THOROUGH = Quality(
     code="thorough",
-    label="Teliti",
+    label="Thorough",
     explanation=(
-        "Lebih lambat, tetapi lebih jarang salah dengar dan lebih jarang "
-        "melewatkan tulisan di layar. Pakai ini kalau hasilnya mau dijadikan "
-        "catatan atau naskah."
+        "Slower, but mishears less and misses less of the text on screen. "
+        "Use this when the result will become notes or a script."
     ),
     speech_model="small",
     beam_size=5,

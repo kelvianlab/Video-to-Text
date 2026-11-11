@@ -64,7 +64,7 @@ def _write_video(path: Path, with_audio: bool = True, limited_range: bool = True
 
 @pytest.fixture(scope="module")
 def sample_video(tmp_path_factory) -> Path:
-    return _write_video(tmp_path_factory.mktemp("video") / "contoh.mp4")
+    return _write_video(tmp_path_factory.mktemp("video") / "sample.mp4")
 
 
 def test_details_are_read(sample_video):
@@ -75,7 +75,7 @@ def test_details_are_read(sample_video):
 
 
 def test_a_silent_video_is_recognised(tmp_path):
-    video = _write_video(tmp_path / "bisu.mp4", with_audio=False)
+    video = _write_video(tmp_path / "silent.mp4", with_audio=False)
     assert not media.read_details(video).has_audio
     with pytest.raises(media.MediaError):
         media.load_audio(video)
@@ -107,15 +107,15 @@ def test_limited_range_video_is_converted_not_refused(sample_video, tmp_path):
 def test_wide_frames_are_scaled_down(tmp_path):
     from PIL import Image
 
-    video = _write_video(tmp_path / "lebar.mp4", with_audio=False)
+    video = _write_video(tmp_path / "wide.mp4", with_audio=False)
     frames = media.extract_frames(video, tmp_path / "h", interval_seconds=2.0, width=160)
     with Image.open(frames[0][1]) as picture:
         assert picture.size == (160, 120)
 
 
 def test_an_unreadable_file_gives_a_plain_error(tmp_path):
-    broken = tmp_path / "rusak.mp4"
-    broken.write_bytes(b"bukan video")
+    broken = tmp_path / "damaged.mp4"
+    broken.write_bytes(b"not a video")
     with pytest.raises(media.MediaError):
         media.read_details(broken)
 
@@ -150,8 +150,8 @@ def test_every_language_choice_maps_to_whisper(window):
     from video_to_text.window import LANGUAGES
 
     assert set(window.language_box.cget("values")) == set(LANGUAGES)
-    assert LANGUAGES["Indonesia"] == "id"
-    assert LANGUAGES["Inggris"] == "en"
+    assert LANGUAGES["Indonesian"] == "id"
+    assert LANGUAGES["English"] == "en"
     assert None in LANGUAGES.values()
 
 
@@ -182,7 +182,7 @@ def test_a_third_language_can_never_be_chosen():
 
 
 def _press_start_and_wait(window, seconds: float = 20.0) -> None:
-    """Press Mulai and pump the window until the run is over.
+    """Press Start and pump the window until the run is over.
 
     The window's event loop is deliberately not running here, only pumped. That
     is stricter than real use: a worker thread that touches a Tk variable fails
@@ -203,14 +203,14 @@ def test_a_full_run_through_the_window(window, tmp_path, monkeypatch):
     from video_to_text import window as window_module
     from video_to_text.core.pipeline import VideoResult
 
-    video = tmp_path / "contoh.mp4"
+    video = tmp_path / "sample.mp4"
     video.write_bytes(b"x")
     received = {}
 
     def fake_process(path, preset, use_gpu, language, report, should_stop):
         received.update(preset=preset.code, use_gpu=use_gpu, language=language)
-        report("Membaca suara...")
-        txt, srt = tmp_path / "contoh.txt", tmp_path / "contoh.srt"
+        report("Reading speech...")
+        txt, srt = tmp_path / "sample.txt", tmp_path / "sample.srt"
         txt.write_text("isi"), srt.write_text("isi")
         return VideoResult(video=path, txt_file=txt, srt_file=srt, speech_count=3, screen_count=2)
 
@@ -219,13 +219,13 @@ def test_a_full_run_through_the_window(window, tmp_path, monkeypatch):
 
     window.location.set(str(video))
     window.quality.set("thorough")
-    window.language.set("Indonesia")
+    window.language.set("Indonesian")
     window.use_gpu.set(False)
     _press_start_and_wait(window)
 
     assert received == {"preset": "thorough", "use_gpu": False, "language": "id"}
-    assert window.status.get().startswith("Selesai.")
-    assert "SELESAI  contoh.mp4" in window.summary.get("1.0", "end")
+    assert window.status.get().startswith("Finished.")
+    assert "DONE  sample.mp4" in window.summary.get("1.0", "end")
     assert str(window.open_button.cget("state")) == "normal"
     assert str(window.language_box.cget("state")) == "readonly"
 
@@ -234,17 +234,17 @@ def test_a_failed_video_is_reported_in_the_window(window, tmp_path, monkeypatch)
     from video_to_text import window as window_module
     from video_to_text.core.pipeline import VideoResult
 
-    video = tmp_path / "rusak.mp4"
+    video = tmp_path / "damaged.mp4"
     video.write_bytes(b"x")
     monkeypatch.setattr(
         window_module, "process_video",
-        lambda path, *a, **k: VideoResult(video=path, error="MediaError: Video tidak bisa dibuka"),
+        lambda path, *a, **k: VideoResult(video=path, error="MediaError: The video cannot be opened"),
     )
     monkeypatch.setattr(window_module.speech, "model_available", lambda name: True)
 
     window.location.set(str(video))
     _press_start_and_wait(window)
 
-    assert window.status.get() == "Tidak ada video yang berhasil dikerjakan."
-    assert "Video tidak bisa dibuka" in window.summary.get("1.0", "end")
+    assert window.status.get() == "No video could be done."
+    assert "The video cannot be opened" in window.summary.get("1.0", "end")
     assert str(window.open_button.cget("state")) == "disabled"

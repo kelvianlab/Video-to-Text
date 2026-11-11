@@ -27,26 +27,27 @@ def free_name(candidate: Path) -> Path:
 def build_txt(lines: list[Line], video_name: str, summary: str) -> str:
     """Build the plain-text file, written for a person to read."""
     parts = [
-        f"Hasil penyalinan video: {video_name}",
-        f"Dibuat: {datetime.now():%d-%m-%Y %H:%M}",
+        f"Transcript of: {video_name}",
+        f"Made: {datetime.now():%Y-%m-%d %H:%M}",
         summary,
         "",
-        "Keterangan label:",
-        "  [SUARA] kata-kata yang terdengar di video",
-        "  [LAYAR] tulisan yang tampil di layar video",
+        "Labels:",
+        "  [SPEECH] words heard in the video",
+        "  [SCREEN] text shown on screen",
         "",
-        "Hasil ini perkiraan mesin, bukan salinan yang dijamin tepat.",
-        "Suara yang bising dan tulisan kecil atau cepat bisa salah atau terlewat.",
+        "This is a machine's best guess, not a guaranteed transcript.",
+        "Noisy sound and small or fast text can be wrong or missed.",
         "",
         "-" * 68,
         "",
     ]
     for line in lines:
         at = clock(line.start, millisecond_separator=".")[:-4]  # seconds are enough
-        body = line.text.replace("\n", "\n" + " " * 20)
-        parts.append(f"[{at}] [{line.source}] {body}")
+        prefix = f"[{at}] [{line.source}] "
+        body = line.text.replace("\n", "\n" + " " * len(prefix))
+        parts.append(prefix + body)
     if not lines:
-        parts.append("(tidak ada suara maupun tulisan layar yang terbaca)")
+        parts.append("(no speech or screen text could be read)")
     return "\n".join(parts) + "\n"
 
 

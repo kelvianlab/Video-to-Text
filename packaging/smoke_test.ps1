@@ -2,15 +2,15 @@
 # video with known speech and a known caption, and require both to come back.
 # Also checks the window opens and stays open.
 #
-#   powershell -File packaging\smoke_test.ps1 -AppFolder "dist\Video ke Teks"
+#   powershell -File packaging\smoke_test.ps1 -AppFolder "dist\Video to Text"
 
 param(
     [Parameter(Mandatory = $true)][string]$AppFolder,
     [string]$Python = "python"
 )
 $ErrorActionPreference = "Stop"
-$exe = Join-Path (Resolve-Path $AppFolder) "Video ke Teks.exe"
-$work = Join-Path $env:TEMP ("video-ke-teks-smoke-" + [guid]::NewGuid().ToString("N"))
+$exe = Join-Path (Resolve-Path $AppFolder) "Video to Text.exe"
+$work = Join-Path $env:TEMP ("video-to-text-smoke-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $work | Out-Null
 
 # 1. Speech from Windows' own voice, so nothing has to be downloaded.
@@ -33,12 +33,12 @@ if (-not (Test-Path $txt)) { throw "no smoke.txt was written" }
 $result = Get-Content $txt -Raw -Encoding UTF8
 Write-Host "---- result ----"; Write-Host $result
 
-$heard = [regex]::Matches($result, '\[SUARA\][^\r\n]*').Value -join ' '
-$shown = [regex]::Matches($result, '\[LAYAR\][^\r\n]*').Value -join ' '
+$heard = [regex]::Matches($result, '\[SPEECH\][^\r\n]*').Value -join ' '
+$shown = [regex]::Matches($result, '\[SCREEN\][^\r\n]*').Value -join ' '
 foreach ($word in 'weather', 'sunny') {
     if ($heard -notmatch $word) { throw "speech check failed: '$word' not heard" }
 }
-if ($shown -notmatch 'TEKS') { throw "screen check failed: caption not read" }
+if ($shown -notmatch 'READY') { throw "screen check failed: caption not read" }
 if (-not (Test-Path (Join-Path $work "smoke.srt"))) { throw "no smoke.srt was written" }
 Write-Host "speech and screen both read correctly"
 

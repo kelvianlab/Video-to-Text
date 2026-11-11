@@ -54,45 +54,42 @@ jobs:
 
       - name: Check the built app hears speech, reads the screen, and opens its window
         shell: pwsh
-        run: ./packaging/smoke_test.ps1 -AppFolder "dist/Video ke Teks"
+        run: ./packaging/smoke_test.ps1 -AppFolder "dist/Video to Text"
 
       - name: Gather licences and zip
         run: python packaging/make_zip.py
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Video-ke-Teks-${{ env.VERSION }}-Windows
-          path: dist/Video-ke-Teks-${{ env.VERSION }}-Windows.zip
+          name: Video-to-Text-${{ env.VERSION }}-Windows
+          path: dist/Video-to-Text-${{ env.VERSION }}-Windows.zip
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          name: Video ke Teks ${{ env.VERSION }}
-          files: dist/Video-ke-Teks-${{ env.VERSION }}-Windows.zip
+          name: Video to Text ${{ env.VERSION }}
+          files: dist/Video-to-Text-${{ env.VERSION }}-Windows.zip
           body: |
-            ## Unduh / Download
+            ## Download
 
-            ### `Video-ke-Teks-${{ env.VERSION }}-Windows.zip` — hanya ini yang perlu diunduh
+            ### `Video-to-Text-${{ env.VERSION }}-Windows.zip` — the only file you need
 
-            1. Unduh berkas zip itu (sekitar 600 MB, karena semua yang dibutuhkan ada di dalamnya).
-            2. Klik kanan, pilih **Extract All**.
-            3. Buka folder `Video ke Teks`, klik dua kali **`Video ke Teks.exe`**.
+            1. Download the zip (about 600 MB, because everything the app needs is inside it).
+            2. Right-click it and choose **Extract All**.
+            3. Open the `Video to Text` folder and double-click **`Video to Text.exe`**.
 
-            Tidak perlu memasang Python, ffmpeg, atau apa pun. Tidak perlu internet.
-            Video tidak dikirim ke mana pun dan tidak diubah.
+            Nothing to install: no Python, no ffmpeg, no internet needed. Your video is never
+            uploaded and never changed.
 
-            Pertama kali, Windows mungkin menampilkan **"Windows protected your PC"**, karena
-            aplikasinya belum bertanda tangan digital. Klik **More info**, lalu **Run anyway**.
+            The first time, Windows may say **"Windows protected your PC"**. That is because the
+            app is not code-signed, not because anything is wrong with it. Click **More info**,
+            then **Run anyway**. Windows asks only once.
+
+            Reads the speech, in **English or Indonesian**, and the on-screen text of any video
+            file, whether or not it ever had subtitles.
 
             ---
-
-            Download the zip, extract it, and double-click `Video ke Teks.exe`. Nothing to
-            install, no internet needed. If Windows says "Windows protected your PC", click
-            **More info**, then **Run anyway**.
-
-            Reads speech in **English and Indonesian**, and on-screen text, from any video file,
-            with or without subtitles.
 
             `Source code (zip)` and `(tar.gz)` are added by GitHub automatically. They are not
             the app; you do not need them.

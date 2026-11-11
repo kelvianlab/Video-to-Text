@@ -5,23 +5,23 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# Hasil penyalinan video dan berkas uji
+# Transcripts and test files
 *.txt
 *.srt
 !README*.txt
 !requirements*.txt
-uji/contoh/
+samples/
 
-# Model yang diunduh otomatis, besarnya ratusan MB sampai GB
+# Models fetched for the build, hundreds of MB to GB
 model/
 *.onnx
 
-# Editor dan sistem operasi
+# Editors and operating systems
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-# Hasil pembuatan aplikasi
+# Build output
 build/
 dist/

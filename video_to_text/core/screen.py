@@ -67,15 +67,15 @@ def _get_reader():
             # Keep the original text: a native library that fails to load looks
             # exactly like a missing one, and hiding it leaves nothing to act on.
             raise ScreenError(
-                "Komponen pembaca tulisan layar tidak bisa dimuat.\n\n"
-                f"Keterangan asli:\n{type(error).__name__}: {error}\n\n"
-                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
+                "The screen text reader could not be loaded.\n\n"
+                f"Original error:\n{type(error).__name__}: {error}\n\n"
+                "The app folder may be incomplete. Extract it again from the original zip."
             ) from error
         latin = latin_model_path()
         if not latin.is_file():
             raise ScreenError(
-                f"Model pembaca tulisan tidak ada di dalam aplikasi.\nDicari di: {latin}\n\n"
-                "Folder aplikasi mungkin tidak lengkap. Ekstrak ulang dari berkas zip aslinya."
+                f"The text reading model is missing from the app.\nLooked in: {latin}\n\n"
+                "The app folder may be incomplete. Extract it again from the original zip."
             )
         _reader = RapidOCR(rec_model_path=str(latin))
     return _reader
