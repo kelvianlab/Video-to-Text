@@ -23,6 +23,9 @@ and Indonesian, so losing Chinese characters costs nothing.
 
 from __future__ import annotations
 
+import os
+import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -58,11 +61,35 @@ def latin_model_path() -> Path:
     return model_folder() / "ocr" / LATIN_MODEL
 
 
+@contextmanager
+def _paths_kept_short():
+    """Stop RapidOCR from undoing the app's short-name restart.
+
+    In a folder too deep for Windows, the app restarts itself through the
+    folder's short 8.3 name (see packaging/start.py). RapidOCR finds its own
+    files with Path(__file__).resolve(), and resolve() turns the short name back
+    into the long one, past 260 characters, where its code and models cannot be
+    opened ("module 'ch_ppocr_v3_det' has no attribute 'TextDetector'"). While
+    it is imported, resolve() keeps the path as given. RapidOCR stores the
+    folder at import time, so this is enough.
+    """
+    if not getattr(sys, "frozen", False):
+        yield
+        return
+    original = Path.resolve
+    Path.resolve = lambda self, strict=False: Path(os.path.abspath(self))
+    try:
+        yield
+    finally:
+        Path.resolve = original
+
+
 def _get_reader():
     global _reader
     if _reader is None:
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            with _paths_kept_short():
+                from rapidocr_onnxruntime import RapidOCR
         except ImportError as error:
             # Keep the original text: a native library that fails to load looks
             # exactly like a missing one, and hiding it leaves nothing to act on.
