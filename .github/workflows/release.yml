@@ -1,4 +1,4 @@
-name: release
+﻿name: release
 
 on:
   push:
@@ -59,23 +59,40 @@ jobs:
       - name: Gather licences and zip
         run: python packaging/make_zip.py
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/cache@v4
         with:
-          name: Video-to-Text-${{ env.VERSION }}-Windows
-          path: dist/Video-to-Text-${{ env.VERSION }}-Windows.zip
+          path: cuda
+          key: cuda-cublas-12.9.2.10-v1
+
+      - name: Fetch NVIDIA's CUDA libraries for the NVIDIA edition
+        run: python packaging/fetch_cuda.py
+
+      - name: Zip the NVIDIA edition
+        run: python packaging/make_zip.py --nvidia
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
           name: Video to Text ${{ env.VERSION }}
-          files: dist/Video-to-Text-${{ env.VERSION }}-Windows.zip
+          files: |
+            dist/Video-to-Text-${{ env.VERSION }}-Windows.zip
+            dist/Video-to-Text-${{ env.VERSION }}-Windows-NVIDIA.zip
           body: |
             ## Download
 
-            ### `Video-to-Text-${{ env.VERSION }}-Windows.zip` — the only file you need
+            Pick **one** of the two zips. Both are the same app.
 
-            1. Download the zip (about 600 MB, because everything the app needs is inside it).
+            | File | For | Size |
+            |---|---|---|
+            | `Video-to-Text-${{ env.VERSION }}-Windows.zip` | any Windows computer; uses the processor | about 600 MB |
+            | `Video-to-Text-${{ env.VERSION }}-Windows-NVIDIA.zip` | computers with an NVIDIA graphics card; reads speech about 5 times faster | about 1.1 GB |
+
+            The NVIDIA edition carries NVIDIA's CUDA libraries inside it, so nothing else has
+            to be installed. On a computer where the card cannot be used, it simply uses the
+            processor, like the ordinary edition.
+
+            1. Download the zip (large, because everything the app needs is inside it).
             2. Right-click it and choose **Extract All**.
             3. Open the `Video to Text` folder and double-click **`Video to Text.exe`**.
 

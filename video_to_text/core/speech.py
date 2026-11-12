@@ -97,6 +97,27 @@ def _load(name: str, device: str):
     return _loaded_models[key]
 
 
+def cuda_folder() -> Path:
+    """Where NVIDIA's CUDA libraries live in the NVIDIA edition of the app.
+
+    The ordinary edition has no such folder and uses the card only when the
+    computer already has CUDA 12 installed.
+    """
+    return model_folder().parent / "cuda"
+
+
+def _use_bundled_cuda() -> None:
+    folder = cuda_folder()
+    if not folder.is_dir() or sys.platform != "win32":
+        return
+    # CTranslate2 loads cuBLAS and cuDNN by name the first time it computes,
+    # through the ordinary DLL search, which reads PATH.
+    path = os.environ.get("PATH", "")
+    if str(folder) not in path.split(os.pathsep):
+        os.environ["PATH"] = str(folder) + os.pathsep + path
+        os.add_dll_directory(str(folder))
+
+
 def _gpu_model(name: str):
     """Return a working model on the card, or raise with the reason it will not work.
 
@@ -113,6 +134,7 @@ def _gpu_model(name: str):
         raise _NoCard()
     if _gpu_failure:
         raise RuntimeError(_gpu_failure)
+    _use_bundled_cuda()
     try:
         model = _load(name, "cuda")
         list(model.transcribe(np.zeros(16000, dtype=np.float32), beam_size=1)[0])

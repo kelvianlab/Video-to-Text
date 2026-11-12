@@ -25,3 +25,6 @@ Thumbs.db
 # Build output
 build/
 dist/
+
+# NVIDIA CUDA libraries for the NVIDIA edition, fetched by packaging/fetch_cuda.py
+cuda/

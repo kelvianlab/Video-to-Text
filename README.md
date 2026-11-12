@@ -1,4 +1,4 @@
-# Video to Text
+﻿# Video to Text
 
 **Turn a video into text: both the words that are spoken and the words shown on screen.**
 
@@ -9,9 +9,10 @@ It works on any video file you have, whether or not it ever had subtitles.
 
 ## Download and use
 
-1. Download **`Video-to-Text-<version>-Windows.zip`** from the
-   [Releases](../../releases/latest) page. It is about 600 MB, because everything the
-   app needs is inside it.
+1. Download one zip from the [Releases](../../releases/latest) page:
+   **`Video-to-Text-<version>-Windows.zip`** (about 600 MB) for any computer, or
+   **`Video-to-Text-<version>-Windows-NVIDIA.zip`** (about 1.1 GB) for a computer with
+   an NVIDIA graphics card. They are large because everything the app needs is inside.
 2. Right-click the zip and choose **Extract All**. Keep the extracted folder together;
    the `.exe` needs the `_internal` folder next to it.
 3. Open the folder and double-click **`Video to Text.exe`**.
@@ -78,10 +79,14 @@ Timings are from a laptop working on its processor alone. A video whose screen
 mostly holds still is quicker, because an unchanged screen is skipped without being
 read.
 
-**An NVIDIA graphics card** can speed up the speech side, but only on a computer
-that already has NVIDIA's CUDA 12 libraries installed; they are far too large to
-ship inside the app. Without them the app simply uses the processor, and the
-result is the same.
+**An NVIDIA graphics card** speeds up the speech side. Download the
+`-NVIDIA` edition for that: it carries NVIDIA's cuBLAS library inside it, so
+nothing has to be installed. On an 11.5-minute Indonesian video (Thorough,
+RTX 4050 laptop), reading the speech took 46 seconds on the card against
+238 seconds on the processor, with the same words. Reading the screen still
+runs on the processor in both editions, so on a video full of on-screen text the
+total time drops by less. Where the card cannot be used, the NVIDIA edition uses
+the processor, and the result is the same.
 
 ## How accurate is it
 
@@ -169,6 +174,8 @@ in `_internal/licenses/`. The main ones:
 the Whisper model (MIT),
 [RapidOCR](https://github.com/RapidAI/RapidOCR) and the PaddleOCR models (Apache 2.0),
 [PyAV](https://github.com/PyAV-Org/PyAV) (BSD) with FFmpeg inside it (LGPL 3).
+The NVIDIA edition also carries NVIDIA's cuBLAS, under NVIDIA's own licence,
+in `_internal/cuda/licenses/`.
 PyAV's FFmpeg is linked against the x264 and x265 encoders (GPL 2); this app only
 reads video and never uses them, but their files are present, so the notices say
 where their source can be had.
